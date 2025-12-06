@@ -54,11 +54,18 @@ const router = createRouter({
           component: () => import('@/views/admin/AntrianView.vue'), // Dashboard Admin
           meta: { title: 'Antrian Verifikasi' }
         },
-        // Tambahan rute arsip nanti
+
+        {
+          path: 'verifikasi/:id',
+          name: 'AdminVerifikasi',
+          component: () => import('@/views/admin/VerifikasiView.vue'),
+          meta: { title: 'Detail Verifikasi' }
+        },
+        
         {
           path: 'arsip',
           name: 'AdminArsip',
-          component: { template: '<div class="p-10">Halaman Arsip (Coming Soon)</div>' },
+          component: () => import('@/views/admin/ArsipView.vue'),
           meta: { title: 'Arsip Dokumen' }
         }
       ]
@@ -92,6 +99,13 @@ const router = createRouter({
           name: 'PengajuanBaru',
           component: () => import('@/views/user/PengajuanFormView.vue'),
           meta: { title: 'Formulir Pengajuan' }
+        },
+        
+        {
+          path: 'riwayat', 
+          name: 'RiwayatPengajuan',
+          component: () => import('@/views/user/RiwayatView.vue'),
+          meta: { title: 'Riwayat Permohonan' }
         }
       ]
     }

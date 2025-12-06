@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+// [BARU] Import SweetAlert2
+import Swal from 'sweetalert2'
 
 export const useAuthStore = defineStore('auth', () => {
   const router = useRouter()
@@ -9,8 +11,7 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || null)
   const user = ref(JSON.parse(localStorage.getItem('user')) || null)
   
-  // [BARU] Simpan waktu login terakhir (Timestamp)
-  // Diperlukan untuk mengecek durasi sesi (SRS SE.AU.3)
+  // Simpan waktu login terakhir (Timestamp)
   const loginTime = ref(localStorage.getItem('loginTime') || null)
 
   // Variable sementara untuk menampung user yang baru Register (Mock)
@@ -21,7 +22,7 @@ export const useAuthStore = defineStore('auth', () => {
     // 1. Cek apakah token ada
     if (!token.value) return false
 
-    // 2. [BARU] Cek Session Timeout (15 Menit = 900.000 ms)
+    // 2. Cek Session Timeout (15 Menit = 900.000 ms)
     if (loginTime.value) {
       const now = new Date().getTime()
       const expiryTime = 15 * 60 * 1000 // 15 Menit sesuai SRS
@@ -30,7 +31,18 @@ export const useAuthStore = defineStore('auth', () => {
       // Jika selisih waktu sekarang dan login > 15 menit
       if (now - lastLogin > expiryTime) {
         logout() // Hapus sesi
-        alert("Sesi Anda telah berakhir (15 menit tidak aktif). Silakan login kembali.")
+        
+        // [UPDATED] Menggunakan SweetAlert2 pengganti alert()
+        Swal.fire({
+          icon: 'warning',
+          title: 'Sesi Berakhir',
+          text: 'Anda tidak aktif selama 15 menit. Silakan login kembali.',
+          confirmButtonColor: '#3085d6',
+          confirmButtonText: 'Login Ulang',
+          allowOutsideClick: false,
+          allowEscapeKey: false
+        })
+
         return false
       }
     }
@@ -44,29 +56,25 @@ export const useAuthStore = defineStore('auth', () => {
 
   // 1. LOGIKA LOGIN
   const login = async (identifier, password, role) => {
-    // Simulasi loading
     await new Promise(resolve => setTimeout(resolve, 800))
 
-    // Konversi input ke String untuk keamanan tipe data
     const strIdentifier = String(identifier).trim()
     const strPassword = String(password)
 
     // --- SKENARIO WARGA ---
     if (role === 'warga') {
-      // Cek User Hardcode (Sesuai request Anda: pass 'pw')
       if (strIdentifier === '12345678' && strPassword === 'pw') {
         const mockUser = { 
           id: 1, 
           name: 'Agung Santoso', 
           email: 'agung@warga.com', 
-          role: 'masyarakat', // Role sesuai SRS
+          role: 'masyarakat', 
           nik: '12345678' 
         }
         _setSession('mock-token-warga-fixed', mockUser)
         return { success: true }
       }
 
-      // Cek User hasil Register (Mock)
       const foundUser = registeredUsers.value.find(u => u.nik === strIdentifier && u.password === strPassword)
       if (foundUser) {
         const mockUser = { 
@@ -83,19 +91,17 @@ export const useAuthStore = defineStore('auth', () => {
     
     // --- SKENARIO ADMIN ---
     else if (role === 'admin') {
-      // Hardcode Admin (Sesuai request Anda: pass 'adm')
       if (strIdentifier === 'admin' && strPassword === 'adm') {
         const mockUser = { 
           id: 99, 
           name: 'Petugas Kelurahan', 
-          role: 'petugas' // Role sesuai SRS
+          role: 'petugas' 
         }
         _setSession('mock-token-admin', mockUser)
         return { success: true }
       }
     }
 
-    // Gagal Login
     return { success: false, message: 'NIK/Username atau Kata Sandi salah.' }
   }
 
@@ -103,7 +109,6 @@ export const useAuthStore = defineStore('auth', () => {
   const register = async (formData) => {
     await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // Simpan ke memori sementara (Mock DB)
     registeredUsers.value.push({
       nik: String(formData.nik),
       password: formData.password,
@@ -117,29 +122,26 @@ export const useAuthStore = defineStore('auth', () => {
 
   // 3. LOGIKA LOGOUT
   const logout = () => {
-    // Reset State
     token.value = null
     user.value = null
-    loginTime.value = null // Reset waktu
+    loginTime.value = null 
 
-    // Hapus dari LocalStorage
     localStorage.removeItem('token')
     localStorage.removeItem('user')
-    localStorage.removeItem('loginTime') // Bersihkan jejak waktu
+    localStorage.removeItem('loginTime') 
   }
 
-  // Helper Private: Menyimpan Sesi & Waktu
+  // Helper Private
   const _setSession = (newToken, newUser) => {
     token.value = newToken
     user.value = newUser
     
-    // [BARU] Catat waktu login saat ini
     const now = new Date().getTime()
     loginTime.value = now
 
     localStorage.setItem('token', newToken)
     localStorage.setItem('user', JSON.stringify(newUser))
-    localStorage.setItem('loginTime', now) // Simpan timestamp
+    localStorage.setItem('loginTime', now) 
   }
 
   return { 

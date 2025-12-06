@@ -1,6 +1,9 @@
 <script setup>
 import { ref } from 'vue'
-import heroBg from '@/assets/images/hero-bg.png' // Background banner
+import { useRouter } from 'vue-router' // [1] WAJIB IMPORT INI
+import heroBg from '@/assets/images/hero-bg.png'
+
+const router = useRouter() // [2] WAJIB DEFINISIKAN INI
 
 // Data Statistik Dummy
 const stats = [
@@ -17,9 +20,10 @@ const applications = ref([
   { id: 'REG-002', pewaris: 'Alm. Hartono', pemohon: 'Bambang', tgl: '02 Des 2025', status: 'Diproses' },
 ])
 
+// [3] FUNGSI NAVIGASI YANG BENAR
 const handleVerifikasi = (id) => {
-  // Nanti redirect ke halaman detail verifikasi
-  console.log('Verifikasi ID:', id)
+  // Arahkan ke halaman detail verifikasi
+  router.push(`/admin/verifikasi/${id}`)
 }
 </script>
 
