@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-// [BARU] Import SweetAlert2
 import Swal from 'sweetalert2'
+// [BARU] Import Service
+import authServices from '@/services/authServices'
 
 export const useAuthStore = defineStore('auth', () => {
   const router = useRouter()
@@ -10,29 +11,22 @@ export const useAuthStore = defineStore('auth', () => {
   // --- STATE ---
   const token = ref(localStorage.getItem('token') || null)
   const user = ref(JSON.parse(localStorage.getItem('user')) || null)
-  
-  // Simpan waktu login terakhir (Timestamp)
   const loginTime = ref(localStorage.getItem('loginTime') || null)
-
-  // Variable sementara untuk menampung user yang baru Register (Mock)
-  const registeredUsers = ref([]) 
 
   // --- GETTERS ---
   const isAuthenticated = computed(() => {
-    // 1. Cek apakah token ada
+    // 1. Cek keberadaan token
     if (!token.value) return false
 
-    // 2. Cek Session Timeout (15 Menit = 900.000 ms)
+    // 2. Cek Session Timeout (15 Menit)
     if (loginTime.value) {
       const now = new Date().getTime()
-      const expiryTime = 15 * 60 * 1000 // 15 Menit sesuai SRS
+      const expiryTime = 15 * 60 * 1000 
       const lastLogin = parseInt(loginTime.value)
 
-      // Jika selisih waktu sekarang dan login > 15 menit
       if (now - lastLogin > expiryTime) {
         logout() // Hapus sesi
         
-        // [UPDATED] Menggunakan SweetAlert2 pengganti alert()
         Swal.fire({
           icon: 'warning',
           title: 'Sesi Berakhir',
@@ -42,11 +36,9 @@ export const useAuthStore = defineStore('auth', () => {
           allowOutsideClick: false,
           allowEscapeKey: false
         })
-
         return false
       }
     }
-    
     return true
   })
 
@@ -54,70 +46,40 @@ export const useAuthStore = defineStore('auth', () => {
 
   // --- ACTIONS ---
 
-  // 1. LOGIKA LOGIN
+  // 1. LOGIKA LOGIN (Sekarang pakai Service)
   const login = async (identifier, password, role) => {
-    await new Promise(resolve => setTimeout(resolve, 800))
+    try {
+      // Panggil Service (Pelayan)
+      const response = await authServices.login(identifier, password)
+      const userData = response.data
 
-    const strIdentifier = String(identifier).trim()
-    const strPassword = String(password)
-
-    // --- SKENARIO WARGA ---
-    if (role === 'warga') {
-      if (strIdentifier === '12345678' && strPassword === 'pw') {
-        const mockUser = { 
-          id: 1, 
-          name: 'Agung Santoso', 
-          email: 'agung@warga.com', 
-          role: 'masyarakat', 
-          nik: '12345678' 
-        }
-        _setSession('mock-token-warga-fixed', mockUser)
-        return { success: true }
+      // Validasi Role (Security Check di Frontend)
+      // Mencegah Warga login di halaman Admin, dan sebaliknya
+      if (role === 'warga' && userData.role !== 'masyarakat') {
+        return { success: false, message: 'Akun ini bukan akun Warga.' }
+      }
+      if (role === 'admin' && userData.role !== 'petugas') {
+        return { success: false, message: 'Akun ini bukan akun Petugas.' }
       }
 
-      const foundUser = registeredUsers.value.find(u => u.nik === strIdentifier && u.password === strPassword)
-      if (foundUser) {
-        const mockUser = { 
-          id: Date.now(), 
-          name: 'Warga Baru', 
-          email: foundUser.email, 
-          role: 'masyarakat', 
-          nik: foundUser.nik 
-        }
-        _setSession('mock-token-warga-registered', mockUser)
-        return { success: true }
-      }
-    } 
-    
-    // --- SKENARIO ADMIN ---
-    else if (role === 'admin') {
-      if (strIdentifier === 'admin' && strPassword === 'adm') {
-        const mockUser = { 
-          id: 99, 
-          name: 'Petugas Kelurahan', 
-          role: 'petugas' 
-        }
-        _setSession('mock-token-admin', mockUser)
-        return { success: true }
-      }
+      // Jika lolos, simpan sesi
+      _setSession(response.token, userData)
+      return { success: true }
+
+    } catch (error) {
+      // Tangkap error dari service (misal: password salah)
+      return { success: false, message: error.message }
     }
-
-    return { success: false, message: 'NIK/Username atau Kata Sandi salah.' }
   }
 
-  // 2. LOGIKA REGISTER
+  // 2. LOGIKA REGISTER (Sekarang pakai Service)
   const register = async (formData) => {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    registeredUsers.value.push({
-      nik: String(formData.nik),
-      password: formData.password,
-      email: formData.email,
-      phone: formData.phone
-    })
-
-    console.log('User baru tersimpan di memori sementara:', registeredUsers.value)
-    return { success: true }
+    try {
+      await authService.register(formData)
+      return { success: true }
+    } catch (error) {
+      return { success: false, message: 'Gagal mendaftar.' }
+    }
   }
 
   // 3. LOGIKA LOGOUT
