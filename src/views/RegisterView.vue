@@ -25,6 +25,28 @@ const handleRegister = async () => {
     })
     return
   }
+
+  // 2. Validasi NIK (16 digit)
+  if (String(formData.value.nik).length !== 16) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'NIK Tidak Valid',
+      text: 'NIK harus terdiri dari 16 digit angka.',
+      confirmButtonColor: '#f59e0b'
+    })
+    return
+  }
+
+  // 3. Validasi Panjang Password
+  if (formData.value.password.length < 8) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Kata Sandi Terlalu Pendek',
+      text: 'Kata sandi minimal 8 karakter.',
+      confirmButtonColor: '#f59e0b'
+    })
+    return
+  }
   
   isLoading.value = true
 
@@ -32,7 +54,7 @@ const handleRegister = async () => {
     const result = await authStore.register(formData.value)
     
     if (result.success) {
-      // 2. Popup Sukses Besar
+      // 4. Popup Sukses Besar
       await Swal.fire({
         icon: 'success',
         title: 'Pendaftaran Berhasil!',
@@ -45,14 +67,14 @@ const handleRegister = async () => {
       Swal.fire({
         icon: 'error',
         title: 'Gagal Mendaftar',
-        text: 'Terjadi kesalahan saat mendaftar.',
+        text: result.message || 'Terjadi kesalahan saat mendaftar.',
       })
     }
   } catch (err) {
     Swal.fire({
       icon: 'error',
       title: 'System Error',
-      text: 'Gagal menghubungi server.',
+      text: err?.message || 'Gagal menghubungi server.',
     })
   } finally {
     isLoading.value = false

@@ -1,51 +1,52 @@
-// src/services/authService.js
+// src/services/authServices.js
 import { MOCK_USERS } from '@/mocks/users.js'
+import { apiPost } from '@/axios'
 
-// Nanti kalau API udah ada, uncomment ini:
-// import axios from 'axios' 
+// Toggle mock mode via env: VITE_USE_MOCK = 'true'
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 export default {
-  // Fungsi Login
+  // Login returns { success: true, data: user, token }
   async login(identifier, password) {
-    // --- MODE MOCK (SEKARANG) ---
-    // Simulasi delay jaringan (loading)
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    // Cari user di file JSON tadi
-    const user = MOCK_USERS.find(u => 
-      u.nik === String(identifier) && u.password === password
-    )
-
-    if (user) {
-      return { success: true, data: user, token: 'mock-token-' + user.id }
-    } else {
+    // Mock mode for local development
+    if (USE_MOCK) {
+      await new Promise((res) => setTimeout(res, 800))
+      const user = MOCK_USERS.find(
+        (u) => u.nik === String(identifier) && u.password === password
+      )
+      if (user) {
+        return { success: true, data: user, token: 'mock-token-' + user.id }
+      }
       throw new Error('NIK atau Kata Sandi salah.')
     }
 
-    // --- MODE API (NANTI - GANTINYA GAMPANG) ---
-    /*
+    // Real API mode
     try {
-      const response = await axios.post('/api/login', { nik: identifier, password })
-      return { success: true, data: response.data.user, token: response.data.token }
+      const res = await apiPost('/auth/login', { nik: identifier, password })
+      // Expecting response like { user: {...}, token: '...' } or similar
+      const user = res.user || res.data?.user || res
+      const token = res.token || res.data?.token
+      if (!user || !token) throw new Error('Invalid response from server.')
+      return { success: true, data: user, token }
     } catch (err) {
-      throw new Error(err.response.data.message)
+      throw new Error(err.message || 'Gagal melakukan login')
     }
-    */
   },
 
-  // Fungsi Register
+  // Register returns { success: true } on success
   async register(userData) {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // Simpan ke array mock sementara (agar bisa login)
-    // Di real API, ini akan mengirim POST request
-    const newUser = {
-      ...userData,
-      id: Date.now(),
-      role: 'masyarakat'
+    if (USE_MOCK) {
+      await new Promise((res) => setTimeout(res, 1000))
+      const newUser = { ...userData, id: Date.now(), role: 'masyarakat' }
+      MOCK_USERS.push(newUser)
+      return { success: true }
     }
-    MOCK_USERS.push(newUser)
-    
-    return { success: true }
+
+    try {
+      await apiPost('/auth/register', userData)
+      return { success: true }
+    } catch (err) {
+      throw new Error(err.message || 'Gagal mendaftar')
+    }
   }
 }

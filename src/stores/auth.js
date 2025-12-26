@@ -51,7 +51,14 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // Panggil Service (Pelayan)
       const response = await authServices.login(identifier, password)
-      const userData = response.data
+
+      // Support different response shapes: { success, data, token } or raw { user, token }
+      const userData = response?.data || response?.user || response
+      const token = response?.token || response?.data?.token
+
+      if (!userData || !token) {
+        return { success: false, message: 'Respon server tidak valid.' }
+      }
 
       // Validasi Role (Security Check di Frontend)
       // Mencegah Warga login di halaman Admin, dan sebaliknya
@@ -63,22 +70,22 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       // Jika lolos, simpan sesi
-      _setSession(response.token, userData)
+      _setSession(token, userData)
       return { success: true }
 
     } catch (error) {
       // Tangkap error dari service (misal: password salah)
-      return { success: false, message: error.message }
+      return { success: false, message: error.message || 'Gagal login.' }
     }
   }
 
   // 2. LOGIKA REGISTER (Sekarang pakai Service)
   const register = async (formData) => {
     try {
-      await authService.register(formData)
+      const result = await authServices.register(formData)
       return { success: true }
     } catch (error) {
-      return { success: false, message: 'Gagal mendaftar.' }
+      return { success: false, message: error.message || 'Gagal mendaftar.' }
     }
   }
 
