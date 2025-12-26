@@ -1,0 +1,8 @@
+Semuanya masih mock-up tinggal integrasiin api ama backendnya~ 
+trus store ke postgre deh.
+
+oiya ini yang tesseract itu cuma cobain doang, nunggu nopal bales
+
+disini gua pake lib sweetalert2 buat toast message dll biar lebih responsif , gampang kustomisasi, bagus
+
+15 menit ga aktif = logout (masih localstorage)
