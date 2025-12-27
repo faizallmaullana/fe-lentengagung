@@ -1,9 +1,9 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router' // [1] WAJIB IMPORT INI
+import { useRouter } from 'vue-router'
 import heroBg from '@/assets/images/hero-bg.png'
 
-const router = useRouter() // [2] WAJIB DEFINISIKAN INI
+const router = useRouter()
 
 // Data Statistik Dummy
 const stats = [
@@ -20,7 +20,6 @@ const applications = ref([
   { id: 'REG-002', pewaris: 'Alm. Hartono', pemohon: 'Bambang', tgl: '02 Des 2025', status: 'Diproses' },
 ])
 
-// [3] FUNGSI NAVIGASI YANG BENAR
 const handleVerifikasi = (id) => {
   // Arahkan ke halaman detail verifikasi
   router.push(`/admin/verifikasi/${id}`)
@@ -81,7 +80,8 @@ const handleVerifikasi = (id) => {
         </div>
       </div>
 
-      <table class="w-full text-left text-sm text-gray-600">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-gray-600 min-w-[700px]">
         <thead class="bg-gray-50 text-gray-500 font-semibold uppercase tracking-wider text-xs border-b border-gray-100">
           <tr>
             <th class="px-6 py-4">Nama Pewaris</th>
@@ -119,6 +119,7 @@ const handleVerifikasi = (id) => {
           </tr>
         </tbody>
       </table>
+      </div>
       
       <div class="p-4 border-t border-gray-100 bg-gray-50 text-center text-xs text-gray-500">
         Menampilkan 4 dari 12.000 data

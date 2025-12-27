@@ -31,7 +31,7 @@ const handleAjukan = () => {
     <header class="relative w-full h-[550px] flex items-center bg-slate-900">
         <div class="absolute inset-0 z-0">
             <img :src="heroBgUrl" alt="Background Gedung" class="w-full h-full object-cover opacity-60" />
-            <div class="absolute inset-0 bg-gradient-to-r from-slate-900/90 to-slate-900/40"></div>
+            <div class="absolute inset-0 bg-linear-to-r from-slate-900/90 to-slate-900/40"></div>
         </div>
 
         <div class="container mx-auto px-6 relative z-10 text-white mt-10">

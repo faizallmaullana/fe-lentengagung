@@ -38,7 +38,7 @@ const archives = ref([
 const searchQuery = ref('')
 const selectedYear = ref('')
 
-// --- LOGIKA FILTERING (FS.S.02) ---
+// --- LOGIKA FILTERING ---
 const filteredArchives = computed(() => {
   return archives.value.filter(doc => {
     const matchQuery = 
@@ -73,7 +73,6 @@ const handleDownload = (docName) => {
 }
 
 const handlePrint = (docName) => {
-  // Simulasi membuka dialog print browser
   Swal.fire({
     title: 'Mencetak...',
     text: `Menyiapkan antarmuka cetak untuk ${docName}`,
@@ -118,7 +117,8 @@ const handlePrint = (docName) => {
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <table class="w-full text-left text-sm text-gray-600">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-gray-600 min-w-[800px]">
         <thead class="bg-gray-50 text-gray-500 font-semibold uppercase tracking-wider text-xs border-b border-gray-100">
           <tr>
             <th class="px-6 py-4">Nomor Surat</th>
@@ -166,7 +166,8 @@ const handlePrint = (docName) => {
             </td>
           </tr>
         </tbody>
-      </table>
+        </table>
+      </div>
 
       <div v-if="filteredArchives.length === 0" class="p-10 text-center text-gray-400">
         <p>Tidak ada dokumen arsip yang cocok dengan filter.</p>

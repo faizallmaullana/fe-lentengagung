@@ -60,8 +60,6 @@ const getStatusClass = (status) => {
 
 // --- ACTIONS ---
 const viewDetail = (id) => {
-  // Nanti diarahkan ke halaman detail
-  // router.push(`/dashboard/pengajuan/${id}`)
   Swal.fire({
     title: 'Detail Pengajuan',
     text: `Menampilkan detail untuk ${id} (Fitur Detail sedang dikembangkan)`,
@@ -111,7 +109,7 @@ const downloadDoc = (docName) => {
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       
       <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm text-gray-600">
+        <table class="w-full text-left text-sm text-gray-600 min-w-[600px]">
           <thead class="bg-gray-50 border-b border-gray-100 text-xs uppercase font-semibold text-gray-500">
             <tr>
               <th class="px-6 py-4">No. Registrasi</th>

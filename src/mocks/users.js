@@ -1,5 +1,3 @@
-// src/mocks/users.js
-
 export const MOCK_USERS = [
   {
     id: 1,
@@ -12,7 +10,7 @@ export const MOCK_USERS = [
   },
   {
     id: 99,
-    nik: 'admin', // username
+    nik: 'admin',
     password: 'adm',
     name: 'Petugas Kelurahan',
     email: 'admin@siwaris.go.id',
