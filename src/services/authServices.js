@@ -39,13 +39,19 @@ export default {
       await new Promise((res) => setTimeout(res, 1000))
       const newUser = { ...userData, id: Date.now(), role: 'masyarakat' }
       MOCK_USERS.push(newUser)
-      return { success: true }
+      // Provide a mock approval token to simulate backend behavior
+      const mockRes = { success: true, approvalToken: 'mock-approval-' + newUser.id }
+      console.debug('[authServices.register] mock response:', mockRes)
+      return mockRes
     }
 
     try {
-      await apiPost('/auth/register', userData)
-      return { success: true }
+      // Return full server response so caller can read token/metadata
+      const res = await apiPost('/auth/register', userData)
+      console.debug('[authServices.register] server response:', res)
+      return res
     } catch (err) {
+      console.error('[authServices.register] error:', err)
       throw new Error(err.message || 'Gagal mendaftar')
     }
   }

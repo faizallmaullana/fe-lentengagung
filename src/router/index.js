@@ -42,6 +42,17 @@ const router = createRouter({
       }
     },
 
+    // --- Rute Verifikasi Email (Approval) ---
+    {
+      path: '/approval',
+      name: 'Approval',
+      component: () => import('@/views/ApprovalView.vue'),
+      meta: {
+        title: 'Verifikasi Email',
+        guest: true
+      }
+    },
+
     // --- RUTE ADMIN (Protected) ---
     {
       path: '/admin',

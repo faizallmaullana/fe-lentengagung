@@ -59,18 +59,33 @@ const handleRegister = async () => {
       password: formData.value.password
     }
 
+    console.debug('[RegisterView] register payload:', payload)
     const result = await authStore.register(payload)
+    console.debug('[RegisterView] register result:', result)
     
     if (result.success) {
-      // 4. Popup Sukses Besar
+      // Extract approval token if provided by backend
+      const approvalToken = result.approvalToken || result.token || result.data?.approvalToken || result.data?.token
+      console.debug('[RegisterView] approvalToken:', approvalToken)
+
+      // 4. Popup Sukses Besar (inform email verification)
       await Swal.fire({
         icon: 'success',
         title: 'Pendaftaran Berhasil!',
-        text: 'Akun Anda telah dibuat. Silakan login menggunakan NIK Anda.',
-        confirmButtonText: 'Lanjut ke Login',
+        text: 'Akun Anda telah dibuat. Silakan cek email untuk kode verifikasi.',
+        confirmButtonText: 'Lanjut ke Verifikasi',
         confirmButtonColor: '#16a34a'
       })
-      router.push('/login')
+
+      // Store token locally as fallback and redirect to approval page
+      if (approvalToken) {
+        console.debug('[RegisterView] saving approvalToken to localStorage')
+        localStorage.setItem('approvalToken', approvalToken)
+        router.push({ path: '/approval', query: { token: approvalToken } })
+      } else {
+        console.debug('[RegisterView] no approvalToken returned, redirecting to /approval')
+        router.push('/approval')
+      }
     } else {
       Swal.fire({
         icon: 'error',

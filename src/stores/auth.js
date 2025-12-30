@@ -82,8 +82,14 @@ export const useAuthStore = defineStore('auth', () => {
   // 2. LOGIKA REGISTER (Sekarang pakai Service)
   const register = async (formData) => {
     try {
-      const result = await authServices.register(formData)
-      return { success: true }
+      const response = await authServices.register(formData)
+      // Normalize possible response shapes so callers can rely on { success, ... }
+      if (response && (response.success === true || response.approvalToken || response.token)) {
+        return { success: true, ...response }
+      }
+      if (response === true) return { success: true }
+      // Fallback: return success with data container
+      return { success: true, data: response }
     } catch (error) {
       return { success: false, message: error.message || 'Gagal mendaftar.' }
     }
