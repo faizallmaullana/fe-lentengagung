@@ -23,6 +23,8 @@ const handleLogin = async () => {
       activeTab.value
     )
 
+    console.debug('[LOGIN] login result:', result)
+
     if (result.success) {
       // 1. TOAST SUKSES (Pojok Kanan Atas)
       const Toast = Swal.mixin({
@@ -42,6 +44,15 @@ const handleLogin = async () => {
         title: `Selamat Datang, ${activeTab.value === 'warga' ? 'Warga' : 'Petugas'}!`
       })
 
+      console.warn(result)
+
+      // Save auth token if provided by backend
+      const authToken = result.data?.access_token
+      if (authToken) {
+        console.debug('[LoginView] saving authToken to localStorage')
+        localStorage.setItem('authToken', authToken)
+      }
+
       // Redirect
       if (activeTab.value === 'warga') {
         router.push('/dashboard') 
@@ -50,6 +61,7 @@ const handleLogin = async () => {
       }
     } else {
       // 2. POPUP ERROR (Tengah)
+      console.warn('[LoginView] login failed:', result)
       Swal.fire({
         icon: 'error',
         title: 'Login Gagal',

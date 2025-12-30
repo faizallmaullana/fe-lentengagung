@@ -64,9 +64,18 @@ const handleRegister = async () => {
     console.debug('[RegisterView] register result:', result)
     
     if (result.success) {
-      // Extract approval token if provided by backend
-      const approvalToken = result.approvalToken || result.token || result.data?.approvalToken || result.data?.token
+      console.warn(result)
+      // Extract auth token and approval token if provided by backend
+      const authToken = result.data?.registration_token
+      const approvalToken = result.approvalToken || result.approval_token || result.token || result.data?.approvalToken || result.data?.token
+      console.debug('[RegisterView] authToken:', authToken)
       console.debug('[RegisterView] approvalToken:', approvalToken)
+
+      // Save auth token to localStorage if available
+      if (authToken) {
+        console.debug('[RegisterView] saving authToken to localStorage')
+        localStorage.setItem('authToken', authToken)
+      }
 
       // 4. Popup Sukses Besar (inform email verification)
       await Swal.fire({
@@ -77,7 +86,7 @@ const handleRegister = async () => {
         confirmButtonColor: '#16a34a'
       })
 
-      // Store token locally as fallback and redirect to approval page
+      // Store approval token locally as fallback and redirect to approval page
       if (approvalToken) {
         console.debug('[RegisterView] saving approvalToken to localStorage')
         localStorage.setItem('approvalToken', approvalToken)

@@ -52,11 +52,15 @@ export const useAuthStore = defineStore('auth', () => {
       // Panggil Service (Pelayan)
       const response = await authServices.login(identifier, password)
 
+      console.error('[AuthStore] login response:', response)
+      
       // Support different response shapes: { success, data, token } or raw { user, token }
-      const userData = response?.data || response?.user || response
-      const token = response?.token || response?.data?.token
+      
+      const token = response?.token
+      const userData = response?.data
+      console.error(token)
 
-      if (!userData || !token) {
+      if (!token) {
         return { success: false, message: 'Respon server tidak valid.' }
       }
 

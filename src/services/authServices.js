@@ -24,10 +24,11 @@ export default {
     try {
       const res = await apiPost('/auth/login', { nik: identifier, password })
       // Expecting response like { user: {...}, token: '...' } or similar
-      const user = res.user || res.data?.user || res
-      const token = res.token || res.data?.token
-      if (!user || !token) throw new Error('Invalid response from server.')
-      return { success: true, data: user, token }
+      const user = res.user
+      console.log(res)
+      const token = res.access_token
+      if (!token) throw new Error('Invalid response from server.')
+      return { success: true, data: user, token}
     } catch (err) {
       throw new Error(err.message || 'Gagal melakukan login')
     }
