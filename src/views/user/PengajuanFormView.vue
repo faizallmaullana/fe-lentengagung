@@ -3,6 +3,8 @@ import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Tesseract from 'tesseract.js' 
 import Swal from 'sweetalert2'
+// Import axios instance
+import api from '@/axios'
 
 const router = useRouter()
 
@@ -11,6 +13,8 @@ const currentStep = ref(1)
 const steps = ['Data Pewaris', 'Data Ahli Waris', 'Harta Warisan', 'Upload Dokumen']
 const progressWidth = computed(() => ((currentStep.value - 1) / (steps.length - 1)) * 100)
 
+const isApproved = ref(false) // Track apakah user sudah klik approval
+const formId = ref(null) // ID dari form yang dibuat via API
 const isScanning = ref(false)
 const scanProgress = ref(0)
 const debugImage = ref(null) // Untuk melihat hasil pre-processing (opsional)
@@ -216,7 +220,7 @@ const submitForm = async () => {
   if (!validateStep4()) return
   const result = await Swal.fire({
     title: 'Kirim Permohonan?',
-    text: "Pastikan data sudah benar. Data tidak dapat diubah.",
+    text: `Pastikan data sudah benar. Data tidak dapat diubah. Form ID: ${formId.value}`,
     icon: 'question',
     showCancelButton: true,
     confirmButtonColor: '#16a34a',
@@ -230,10 +234,54 @@ const submitForm = async () => {
       router.push('/dashboard')
   }
 }
+
+// --- APPROVAL HANDLER ---
+const handleApproval = async () => {
+  try {
+    // Hit API /api/form/create
+    const response = await api.post('/form/create')
+    console.log('Form created:', response.data)
+    
+    // Simpan formId
+    formId.value = response.data.id
+    
+    // Jika berhasil, lanjut ke form
+    isApproved.value = true
+  } catch (error) {
+    console.error('Error creating form:', error)
+    Swal.fire({
+      icon: 'error',
+      title: 'Gagal Membuat Form',
+      text: error.response?.data?.error || 'Terjadi kesalahan saat membuat form. Silakan coba lagi.',
+      confirmButtonColor: '#3085d6'
+    })
+  }
+}
 </script>
 
 <template>
   <div class="max-w-4xl mx-auto pb-20">
+    
+    <!-- Halaman Approval -->
+    <div v-if="!isApproved" class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+      <h1 class="text-2xl font-bold text-gray-800 mb-6">Persetujuan Pengajuan Waris</h1>
+      <div class="mb-8">
+        <p class="text-gray-700 mb-4">
+          Sebelum melanjutkan pengajuan, Anda harus menyetujui syarat dan ketentuan berikut:
+        </p>
+        <div class="bg-gray-50 p-6 rounded-lg text-left max-w-2xl mx-auto">
+          <p class="text-sm text-gray-600 leading-relaxed">
+            Saya bersedia mengikuti proses pengajuan waris dengan benar dan bertanggung jawab. Saya menyatakan bahwa semua data yang saya berikan adalah benar dan sesuai dengan dokumen asli. Saya memahami bahwa pengajuan ini akan diproses sesuai dengan peraturan yang berlaku di Kelurahan Lenteng Agung.
+          </p>
+        </div>
+      </div>
+      <button @click="handleApproval" class="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-lg font-medium">
+        Saya Bersedia Mengikuti Proses Pengajuan
+      </button>
+    </div>
+
+    <!-- Form Pengajuan -->
+    <div v-else>
     
     <div class="mb-8">
       <h1 class="text-2xl font-bold text-gray-800 mb-6">Formulir Pengajuan Waris</h1>
@@ -315,6 +363,8 @@ const submitForm = async () => {
         <div v-else></div> 
         <button v-if="currentStep < 4" @click="nextStep" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-lg">Lanjut</button>
         <button v-else @click="submitForm" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-lg">Kirim Permohonan</button>
+      </div>
+
       </div>
 
     </div>
