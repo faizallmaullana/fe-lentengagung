@@ -1,42 +1,15 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Swal from 'sweetalert2'
+import api from '@/axios'
 
 const router = useRouter()
 const searchQuery = ref('')
 
-// --- MOCK DATA (Simulasi Database) ---
-const applications = ref([
-  { 
-    id: 'REG-2025-001', 
-    date: '01 Des 2025', 
-    pewaris: 'Alm. Budi Santoso', 
-    status: 'Selesai',
-    note: 'Surat telah diterbitkan.'
-  },
-  { 
-    id: 'REG-2025-005', 
-    date: '05 Des 2025', 
-    pewaris: 'Alm. Siti Aminah', 
-    status: 'Sedang Diproses',
-    note: 'Verifikasi berkas oleh petugas.'
-  },
-  { 
-    id: 'REG-2025-008', 
-    date: '06 Des 2025', 
-    pewaris: 'Alm. Suparman', 
-    status: 'Perbaikan', // Revisi
-    note: 'Scan KTP Pewaris kurang jelas.'
-  },
-  { 
-    id: 'REG-2025-010', 
-    date: '07 Des 2025', 
-    pewaris: 'Alm. Hartono', 
-    status: 'Diajukan',
-    note: 'Menunggu antrian verifikasi.'
-  }
-])
+// --- STATE ---
+const applications = ref([])
+const isLoading = ref(false)
 
 // --- LOGIKA FILTER SEARCH ---
 const filteredList = computed(() => {
@@ -59,6 +32,36 @@ const getStatusClass = (status) => {
 }
 
 // --- ACTIONS ---
+const loadApplications = async () => {
+  isLoading.value = true
+  try {
+    const res = await api.get('/form/all')
+    const data = res?.data
+    // Normalize response shapes
+    let items = []
+    if (Array.isArray(data)) items = data
+    else if (data && Array.isArray(data.data)) items = data.data
+    else if (data) items = [data]
+
+    // Map to UI shape
+    applications.value = items.map(it => ({
+      id: it.id || it.kode_registrasi || it.registration_code || '---',
+      date: it.created_at || it.timestamp || it.date || '',
+      pewaris: it.pewaris?.nama || it.fields?.nama || it.profile?.name || it.user_name || it.owner_name || '—',
+      status: it.status || it.state || 'Diajukan',
+      note: it.note || it.fields?.keterangan || ''
+    }))
+  } catch (error) {
+    console.error('Failed to load applications', error)
+    Swal.fire({ icon: 'error', title: 'Gagal memuat riwayat', text: 'Coba lagi nanti.' })
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadApplications()
+})
 const viewDetail = (id) => {
   // Nanti diarahkan ke halaman detail
   // router.push(`/dashboard/pengajuan/${id}`)
