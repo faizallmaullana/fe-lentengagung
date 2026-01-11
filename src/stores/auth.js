@@ -75,7 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
   // 2. LOGIKA REGISTER (Sekarang pakai Service)
   const register = async (formData) => {
     try {
-      await authService.register(formData)
+      await authServices.register(formData)
       return { success: true }
     } catch (error) {
       return { success: false, message: 'Gagal mendaftar.' }

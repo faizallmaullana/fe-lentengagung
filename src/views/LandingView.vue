@@ -83,15 +83,44 @@ const handleAjukan = () => {
                  <img :src="logoUrl" alt="Logo Footer" class="h-16 w-auto" />
                  <div class="text-sm text-slate-600">
                     <h3 class="font-bold text-slate-900 text-lg mb-2">Kelurahan<br>Lenteng Agung</h3>
-                    <p class="leading-relaxed">
+                    <p class="leading-relaxed mb-4">
                         Jl. Agung Raya I No.9, RT.9/RW.2, Lenteng Agung, Kec. Jagakarsa, Kota Jakarta Selatan, Daerah Khusus Ibukota Jakarta 12610
                     </p>
+                    
+                    <a 
+                        href="https://www.google.com/maps/dir//Kantor+Lurah+Lenteng+Agung" 
+                        target="_blank"
+                        class="text-green-600 font-semibold hover:underline flex items-center gap-1"
+                    >
+                        Buka Petunjuk Arah →
+                    </a>
                  </div>
             </div>
 
             <div class="flex justify-start md:justify-end">
-                 <div class="w-full md:w-2/3 h-40 bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 text-sm font-medium rounded-sm">
-                    Maps Area
+                 <div class="w-full md:w-2/3 h-48 bg-gray-200 rounded-xl overflow-hidden shadow-md border border-gray-300 relative group">
+                    
+                    <iframe 
+                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3965.397556770747!2d106.8294623749914!3d-6.342523993646731!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69ec3cb5250323%3A0xf64347703377700!2sKantor%20Lurah%20Lenteng%20Agung!5e0!3m2!1sid!2sid!4v1700000000000!5m2!1sid!2sid" 
+                        width="100%" 
+                        height="100%" 
+                        style="border:0;" 
+                        allowfullscreen="" 
+                        loading="lazy" 
+                        referrerpolicy="no-referrer-when-downgrade"
+                        class="w-full h-full"
+                    ></iframe>
+
+                    <a 
+                        href="https://maps.app.goo.gl/XyZ123ABC" 
+                        target="_blank"
+                        class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors pointer-events-none"
+                    >
+                        <div class="absolute bottom-2 right-2 bg-white text-xs font-bold px-2 py-1 rounded shadow text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">
+                            Buka Maps ↗
+                        </div>
+                    </a>
+
                  </div>
             </div>
         </div>
