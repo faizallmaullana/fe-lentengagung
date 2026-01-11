@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Tesseract from 'tesseract.js' 
 import Swal from 'sweetalert2'
@@ -15,6 +15,7 @@ const progressWidth = computed(() => ((currentStep.value - 1) / (steps.length - 
 
 const isApproved = ref(false) // Track apakah user sudah klik approval
 const formId = ref(null) // ID dari form yang dibuat via API
+const isChecking = ref(true) // Track apakah sedang check existing forms
 const isScanning = ref(false)
 const scanProgress = ref(0)
 const debugImage = ref(null) // Untuk melihat hasil pre-processing (opsional)
@@ -257,13 +258,59 @@ const handleApproval = async () => {
     })
   }
 }
+
+// --- CHECK EXISTING FORMS ---
+const checkExistingForms = async () => {
+  try {
+    const response = await api.get('/form/')
+    const data = response?.data
+    console.log('Existing forms:', data)
+
+    // Support multiple response shapes: array, single object, or { data: [...] }
+    let exists = false
+    if (Array.isArray(data) && data.length > 0) {
+      formId.value = data[0].id
+      exists = true
+    } else if (data && data.id) {
+      formId.value = data.id
+      exists = true
+    } else if (data && Array.isArray(data.data) && data.data.length > 0) {
+      formId.value = data.data[0].id
+      exists = true
+    } else if (data && data.data && data.data.id) {
+      formId.value = data.data.id
+      exists = true
+    }
+
+    if (exists) {
+      isApproved.value = true
+    }
+    // Jika tidak ada, tetap tampilkan halaman persetujuan
+  } catch (error) {
+    console.error('Error checking existing forms:', error)
+    // Jika error, tetap tampilkan persetujuan (aman)
+  } finally {
+    isChecking.value = false
+  }
+}
+
+// Lifecycle
+onMounted(() => {
+  checkExistingForms()
+})
 </script>
 
 <template>
   <div class="max-w-4xl mx-auto pb-20">
     
+    <!-- Loading saat check existing forms -->
+    <div v-if="isChecking" class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+      <p class="text-gray-600">Memeriksa status pengajuan...</p>
+    </div>
+
     <!-- Halaman Approval -->
-    <div v-if="!isApproved" class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+    <div v-else-if="!isApproved" class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
       <h1 class="text-2xl font-bold text-gray-800 mb-6">Persetujuan Pengajuan Waris</h1>
       <div class="mb-8">
         <p class="text-gray-700 mb-4">
