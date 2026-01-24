@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 // Client-side OCR removed: we send file to server OCR endpoint instead
 import Swal from 'sweetalert2'
@@ -7,6 +7,9 @@ import Swal from 'sweetalert2'
 import api from '@/axios'
 
 const router = useRouter()
+
+const STORAGE_KEY = 'pengajuan-form-draft-v1'
+const isBrowser = typeof window !== 'undefined'
 
 // --- STATE ---
 const currentStep = ref(1)
@@ -49,24 +52,82 @@ const assignBasePersonFields = (target) => {
   })
 }
 
+const spouseTemplate = () => ({ ...basePersonFields(), hubungan: 'Pasangan', ktpFile: null })
 const newEmptyAhli = () => ({ ...basePersonFields(), hubungan: 'Anak Kandung', ktpFile: null })
 const newEmptyHarta = () => ({ jenis: '', deskripsi: '', noSurat: '' })
-const newPasangan = () => ({ ...basePersonFields(), hubungan: 'Pasangan', ktpFile: null })
 
 const form = reactive({
   pewaris: basePersonFields(),
-  pasangan: newPasangan(),
-  ahliWarisList: [newEmptyAhli()],
+  ahliWarisList: [spouseTemplate(), newEmptyAhli()],
   hartaList: [newEmptyHarta()],
   files: { ktpPewaris: null, kk: null, suratKematian: null }
 })
 
+const spouseEntry = computed(() => form.ahliWarisList[0])
+const childList = computed(() => form.ahliWarisList.slice(1))
+
+const getFormSnapshot = () => ({
+  pewaris: { ...form.pewaris },
+  ahliWarisList: form.ahliWarisList.map((ahli) => {
+    const { ktpFile, ...rest } = ahli
+    return { ...rest, ktpFile: null }
+  }),
+  hartaList: form.hartaList.map((harta) => ({ ...harta })),
+  currentStep: currentStep.value
+})
+
+const persistFormDraft = () => {
+  if (!isBrowser) return
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(getFormSnapshot()))
+  } catch (error) {
+    console.warn('Gagal menyimpan draft pengajuan', error)
+  }
+}
+
+const clearFormDraft = () => {
+  if (!isBrowser) return
+  localStorage.removeItem(STORAGE_KEY)
+}
+
+const loadFormDraft = () => {
+  if (!isBrowser) return
+  const raw = localStorage.getItem(STORAGE_KEY)
+  if (!raw) return
+  try {
+    const draft = JSON.parse(raw)
+    if (draft.pewaris) Object.assign(form.pewaris, draft.pewaris)
+    if (Array.isArray(draft.ahliWarisList) && draft.ahliWarisList.length > 0) {
+      const normalized = draft.ahliWarisList.map((entry, index) => {
+        const template = index === 0 ? spouseTemplate() : newEmptyAhli()
+        return { ...template, ...entry, ktpFile: null, hubungan: template.hubungan }
+      })
+      if (normalized.length < 2) normalized.push(newEmptyAhli())
+      form.ahliWarisList.splice(0, form.ahliWarisList.length, ...normalized)
+    }
+    if (Array.isArray(draft.hartaList) && draft.hartaList.length > 0) {
+      const mapped = draft.hartaList.map((item) => ({
+        jenis: item.jenis || '',
+        deskripsi: item.deskripsi || '',
+        noSurat: item.noSurat || ''
+      }))
+      form.hartaList.splice(0, form.hartaList.length, ...mapped)
+    }
+    if (typeof draft.currentStep === 'number' && draft.currentStep >= 1 && draft.currentStep <= steps.length) {
+      currentStep.value = draft.currentStep
+    }
+  } catch (error) {
+    console.warn('Gagal memuat draft pengajuan', error)
+    localStorage.removeItem(STORAGE_KEY)
+  }
+}
+
+watch(form, () => persistFormDraft(), { deep: true })
+watch(currentStep, () => persistFormDraft())
+
 const resetFormSection = () => {
   assignBasePersonFields(form.pewaris)
-  assignBasePersonFields(form.pasangan)
-  form.pasangan.hubungan = 'Pasangan'
-  form.pasangan.ktpFile = null
-  form.ahliWarisList.splice(0, form.ahliWarisList.length, newEmptyAhli())
+  form.ahliWarisList.splice(0, form.ahliWarisList.length, spouseTemplate(), newEmptyAhli())
   form.hartaList.splice(0, form.hartaList.length, newEmptyHarta())
   form.files.ktpPewaris = null
   form.files.kk = null
@@ -404,12 +465,14 @@ const handlePasanganKtpUpload = async (event) => {
     const res = await api.post('/upload/ocr/ktp', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
     const parsed = resolveOcrPayload(res?.data)
 
-    form.pasangan.ktpFile = file
+    const spouse = spouseEntry.value
+    if (!spouse) return
+    spouse.ktpFile = file
 
     if (parsed) {
       const { data } = unwrapOcrPayload(parsed)
       if (data) {
-        applyOcrToEntity(form.pasangan, data)
+        applyOcrToEntity(spouse, data)
         Swal.fire({ icon: 'success', title: 'OCR Sukses', text: 'Data pasangan terisi otomatis.' })
       } else {
         Swal.fire({ icon: 'info', title: 'OCR Tidak Tersedia', text: 'File tersimpan, silakan isi manual.' })
@@ -420,7 +483,8 @@ const handlePasanganKtpUpload = async (event) => {
   } catch (error) {
     console.error('OCR upload failed for pasangan', error)
     Swal.fire({ icon: 'error', title: 'Gagal Mengunggah', text: 'Terjadi kesalahan saat memproses OCR.' })
-    form.pasangan.ktpFile = file
+    const spouse = spouseEntry.value
+    if (spouse) spouse.ktpFile = file
   } finally {
     try { Swal.close() } catch (e) {}
     isScanning.value = false
@@ -428,10 +492,11 @@ const handlePasanganKtpUpload = async (event) => {
   }
 }
 
-const handleAhliKtpUpload = async (event, index) => {
+const handleChildKtpUpload = async (event, childIndex) => {
   const file = event.target.files[0]
   if (!file) return
-  const ahli = form.ahliWarisList[index]
+  const absoluteIndex = childIndex + 1
+  const ahli = form.ahliWarisList[absoluteIndex]
   if (!ahli) return
 
   if (file.size > 5 * 1024 * 1024) {
@@ -454,7 +519,7 @@ const handleAhliKtpUpload = async (event, index) => {
     ahli.ktpFile = file
 
     if (parsed) {
-      applyOcrToAhli(parsed, index)
+      applyOcrToAhli(parsed, absoluteIndex)
       Swal.fire({ icon: 'success', title: 'OCR Sukses', text: 'Nama dan NIK ahli waris terisi otomatis.' })
     } else {
       Swal.fire({ icon: 'info', title: 'OCR Tidak Tersedia', text: 'File tersimpan, silakan isi data manual.' })
@@ -470,10 +535,13 @@ const handleAhliKtpUpload = async (event, index) => {
   }
 }
 
-const addAhliWaris = () => { form.ahliWarisList.push(newEmptyAhli()) }
-const removeAhliWaris = (index) => {
-  if (form.ahliWarisList.length > 1) form.ahliWarisList.splice(index, 1)
-  else Swal.fire('Gagal', 'Minimal 1 Ahli Waris.', 'warning')
+const addChild = () => { form.ahliWarisList.push(newEmptyAhli()) }
+const removeChild = (childIndex) => {
+  if (form.ahliWarisList.length <= 2) {
+    Swal.fire('Gagal', 'Minimal 1 Anak sebagai ahli waris.', 'warning')
+    return
+  }
+  form.ahliWarisList.splice(childIndex + 1, 1)
 }
 const addHarta = () => { form.hartaList.push(newEmptyHarta()) }
 const removeHarta = (index) => {
@@ -489,8 +557,9 @@ const validateStep1 = () => {
   return true
 }
 const validateStep2 = () => {
-  for (let i = 0; i < form.ahliWarisList.length; i++) {
-    const ahli = form.ahliWarisList[i]
+  const children = childList.value
+  for (let i = 0; i < children.length; i++) {
+    const ahli = children[i]
     if (!ahli.nama || !ahli.nik || !ahli.hubungan) { Swal.fire('Data Kurang', `Ahli Waris ke-${i + 1} belum lengkap.`, 'warning'); return false }
     if (String(ahli.nik).length !== 16) { Swal.fire('Format Salah', `NIK Ahli Waris ke-${i + 1} harus 16 digit.`, 'warning'); return false }
   }
@@ -538,6 +607,7 @@ const submitForm = async () => {
       Swal.fire({ title: 'Mengirim...', didOpen: () => Swal.showLoading() })
       await new Promise(r => setTimeout(r, 1500))
       await Swal.fire({ icon: 'success', title: 'Berhasil!', text: 'Permohonan terkirim.', confirmButtonColor: '#16a34a' })
+      clearFormDraft()
       router.push('/dashboard')
   }
 }
@@ -602,6 +672,7 @@ const checkExistingForms = async () => {
 
 // Lifecycle
 onMounted(() => {
+  loadFormDraft()
   checkExistingForms()
 })
 </script>
@@ -703,57 +774,57 @@ onMounted(() => {
           <div class="flex justify-between items-center border-b pb-2">
             <div>
               <h2 class="text-lg font-bold text-gray-800">Data Pasangan</h2>
-              <p class="text-sm text-gray-500">Isi data pasangan terlebih dahulu agar sistem tahu siapa yang akan menjadi wali/kepemilikan sebelum anak-anaknya.</p>
+              <p class="text-sm text-gray-500">Isi data pasangan terlebih dahulu supaya masuk ke bagian ahli waris sebelum menambahkan anak.</p>
             </div>
-            <span class="text-xs text-gray-500">Opsional jika tidak memiliki pasangan</span>
+            <span class="text-xs text-gray-500">Opsional jika belum memiliki pasangan</span>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label class="block text-xs font-bold text-gray-500 mb-1">NIK Pasangan</label>
-              <input v-model="form.pasangan.nik" type="number" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="16 Digit" />
+              <input v-model="spouseEntry.nik" type="number" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="16 Digit" />
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-500 mb-1">Nama Lengkap</label>
-              <input v-model="form.pasangan.nama" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Nama sesuai KTP" />
+              <input v-model="spouseEntry.nama" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Nama sesuai KTP" />
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-500 mb-1">Tanggal Meninggal</label>
-              <input v-model="form.pasangan.tanggalMeninggal" type="date" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" />
+              <input v-model="spouseEntry.tanggalMeninggal" type="date" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" />
               <p class="text-xs text-gray-400 mt-1">Opsional, jika pasangan sudah meninggal</p>
             </div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label class="block text-xs font-bold text-gray-500 mb-1">Alamat Terakhir</label>
-              <input v-model="form.pasangan.alamat" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Alamat" />
+              <input v-model="spouseEntry.alamat" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Alamat" />
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-500 mb-1">Agama</label>
-              <input v-model="form.pasangan.agama" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Agama" />
+              <input v-model="spouseEntry.agama" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Agama" />
             </div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Jenis Kelamin</label><input v-model="form.pasangan.jenisKelamin" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Laki-laki / Perempuan" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Golongan Darah</label><input v-model="form.pasangan.golonganDarah" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="A / B / O / AB" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Pekerjaan</label><input v-model="form.pasangan.pekerjaan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Pekerjaan" /></div>
+            <div><label class="block text-xs font-bold text-gray-500 mb-1">Jenis Kelamin</label><input v-model="spouseEntry.jenisKelamin" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Laki-laki / Perempuan" /></div>
+            <div><label class="block text-xs font-bold text-gray-500 mb-1">Golongan Darah</label><input v-model="spouseEntry.golonganDarah" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="A / B / O / AB" /></div>
+            <div><label class="block text-xs font-bold text-gray-500 mb-1">Pekerjaan</label><input v-model="spouseEntry.pekerjaan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Pekerjaan" /></div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Kecamatan</label><input v-model="form.pasangan.kecamatan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Kecamatan" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Kelurahan/Desa</label><input v-model="form.pasangan.kelurahanAtauDesa" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Kelurahan atau Desa" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Kewarganegaraan</label><input v-model="form.pasangan.kewarganegaraan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="WNI" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Status Perkawinan</label><input v-model="form.pasangan.statusPerkawinan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Status" /></div>
+            <div><label class="block text-xs font-bold text-gray-500 mb-1">Kecamatan</label><input v-model="spouseEntry.kecamatan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Kecamatan" /></div>
+            <div><label class="block text-xs font-bold text-gray-500 mb-1">Kelurahan/Desa</label><input v-model="spouseEntry.kelurahanAtauDesa" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Kelurahan atau Desa" /></div>
+            <div><label class="block text-xs font-bold text-gray-500 mb-1">Kewarganegaraan</label><input v-model="spouseEntry.kewarganegaraan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="WNI" /></div>
+            <div><label class="block text-xs font-bold text-gray-500 mb-1">Status Perkawinan</label><input v-model="spouseEntry.statusPerkawinan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Status" /></div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">RT</label><input v-model="form.pasangan.rt" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="RT" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">RW</label><input v-model="form.pasangan.rw" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="RW" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Tanggal Lahir</label><input v-model="form.pasangan.tanggalLahir" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="DD-MM-YYYY" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Tempat Lahir</label><input v-model="form.pasangan.tempatLahir" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Tempat Lahir" /></div>
+            <div><label class="block text-xs font-bold text-gray-500 mb-1">RT</label><input v-model="spouseEntry.rt" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="RT" /></div>
+            <div><label class="block text-xs font-bold text-gray-500 mb-1">RW</label><input v-model="spouseEntry.rw" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="RW" /></div>
+            <div><label class="block text-xs font-bold text-gray-500 mb-1">Tanggal Lahir</label><input v-model="spouseEntry.tanggalLahir" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="DD-MM-YYYY" /></div>
+            <div><label class="block text-xs font-bold text-gray-500 mb-1">Tempat Lahir</label><input v-model="spouseEntry.tempatLahir" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Tempat Lahir" /></div>
           </div>
           <div>
             <label class="text-xs font-semibold text-gray-600 mb-1 block">Scan KTP Pasangan</label>
             <input @change="handlePasanganKtpUpload" accept="image/*" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" type="file" :disabled="isScanning" />
             <p class="text-xs text-gray-400 mt-1">Unggah untuk autofill data (nama, NIK, dll).</p>
-            <p class="text-xs text-gray-500 mt-1">{{ form.pasangan.ktpFile ? 'File terakhir: ' + form.pasangan.ktpFile.name : 'Belum mengunggah KTP pasangan' }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ spouseEntry.ktpFile ? 'File terakhir: ' + spouseEntry.ktpFile.name : 'Belum mengunggah KTP pasangan' }}</p>
           </div>
         </div>
         <div class="border-t pt-4 space-y-4">
@@ -762,10 +833,10 @@ onMounted(() => {
               <h3 class="text-lg font-bold text-gray-800">Anak (sub dari pasangan)</h3>
               <p class="text-sm text-gray-500">Setiap anak akan dianggap ahli waris dari pasangan yang Anda isi di atas.</p>
             </div>
-            <button @click="addAhliWaris" class="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-200">+ Tambah Anak</button>
+            <button @click="addChild" class="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-200">+ Tambah Anak</button>
           </div>
-          <div v-for="(ahli, index) in form.ahliWarisList" :key="index" class="bg-gray-50 p-4 rounded-lg border relative">
-            <button v-if="form.ahliWarisList.length > 1" @click="removeAhliWaris(index)" class="absolute top-2 right-2 text-red-400 hover:text-red-600">✕</button>
+          <div v-for="(ahli, index) in childList" :key="index" class="bg-gray-50 p-4 rounded-lg border relative">
+            <button v-if="childList.length > 1" @click="removeChild(index)" class="absolute top-2 right-2 text-red-400 hover:text-red-600">✕</button>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div><label class="text-xs font-bold text-gray-500">Nama *</label><input v-model="ahli.nama" class="w-full px-3 py-2 border rounded text-sm mt-1" /></div>
               <div><label class="text-xs font-bold text-gray-500">NIK *</label><input v-model="ahli.nik" type="number" class="w-full px-3 py-2 border rounded text-sm mt-1" /></div>
@@ -773,7 +844,7 @@ onMounted(() => {
             </div>
             <div class="mt-4">
               <label class="text-xs font-semibold text-gray-600 mb-1 block">Scan KTP Ahli Waris</label>
-              <input @change="e => handleAhliKtpUpload(e, index)" accept="image/*" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" type="file" :disabled="isScanning" />
+              <input @change="e => handleChildKtpUpload(e, index)" accept="image/*" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" type="file" :disabled="isScanning" />
               <p class="text-xs text-gray-400 mt-1">Upload KTP untuk mengisi data otomatis.</p>
               <p class="text-xs text-gray-500 mt-1">{{ ahli.ktpFile ? 'File terakhir: ' + ahli.ktpFile.name : 'Belum mengunggah KTP untuk OCR' }}</p>
             </div>
