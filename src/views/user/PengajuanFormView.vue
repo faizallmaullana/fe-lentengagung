@@ -735,6 +735,12 @@ const prevStep = () => {
 }
 const submitForm = async () => {
   if (!validateStep4()) return
+  
+  if (!formId.value) {
+    Swal.fire('Error', 'ID form tidak ditemukan. Silakan refresh halaman.', 'error')
+    return
+  }
+  
   const result = await Swal.fire({
     title: 'Kirim Permohonan?',
     text: `Pastikan data sudah benar. Data tidak dapat diubah. Form ID: ${formId.value}`,
@@ -744,12 +750,54 @@ const submitForm = async () => {
     cancelButtonColor: '#d33',
     confirmButtonText: 'Ya, Kirim!'
   })
+  
   if (result.isConfirmed) {
-      Swal.fire({ title: 'Mengirim...', didOpen: () => Swal.showLoading() })
-      await new Promise(r => setTimeout(r, 1500))
-      await Swal.fire({ icon: 'success', title: 'Berhasil!', text: 'Permohonan terkirim.', confirmButtonColor: '#16a34a' })
+    try {
+      Swal.fire({ title: 'Mengirim permohonan...', didOpen: () => Swal.showLoading() })
+      
+      // Prepare form data for submission
+      const formData = {
+        pewaris: form.pewaris,
+        ahliWarisList: form.ahliWarisList.map(ahli => {
+          const { ktpFile, aktaKelahiranFile, ...rest } = ahli
+          return {
+            ...rest,
+            aktaFileName: ahli.aktaFileName || null
+          }
+        }),
+        saksiList: form.saksiList.map(saksi => {
+          const { ktpFile, ...rest } = saksi
+          return rest
+        }),
+        dokumenPendukung: form.dokumenPendukung.map(dok => ({
+          nama: dok.nama,
+          fileName: dok.fileName,
+          uploaded: dok.uploaded
+        }))
+      }
+      
+      // Submit to PUT /api/request/:id_request
+      const response = await api.put(`/form/${formId.value}`, formData)
+      
+      await Swal.fire({ 
+        icon: 'success', 
+        title: 'Berhasil!', 
+        text: 'Permohonan berhasil dikirim dan sedang diproses.', 
+        confirmButtonColor: '#16a34a' 
+      })
+      
       clearFormDraft()
       router.push('/dashboard')
+      
+    } catch (error) {
+      console.error('Submit form failed:', error)
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Mengirim',
+        text: error.response?.data?.error || 'Terjadi kesalahan saat mengirim permohonan. Silakan coba lagi.',
+        confirmButtonColor: '#d33'
+      })
+    }
   }
 }
 
