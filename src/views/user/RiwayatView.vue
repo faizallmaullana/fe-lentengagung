@@ -93,6 +93,19 @@ const closeDetailModal = () => {
   selectedForm.value = null
 }
 
+const viewDocument = (fileType, fileName) => {
+  if (!fileName) return
+  
+  // Open document in new tab using backend endpoint
+  const documentUrl = `${api.defaults.baseURL}/upload/${fileType}/${fileName}`
+  window.open(documentUrl, '_blank')
+}
+
+const getDocumentUrl = (fileType, fileName) => {
+  if (!fileName) return null
+  return `${api.defaults.baseURL}/upload/${fileType}/${fileName}`
+}
+
 const downloadDoc = (docName) => {
   Swal.fire({
     title: 'Mengunduh Dokumen...',
@@ -273,6 +286,13 @@ const downloadDoc = (docName) => {
               </svg>
               Data Pewaris
             </h3>
+            
+            <!-- KTP Pewaris Display -->
+            <div v-if="selectedForm.pewaris.ktpFileName" class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p class="text-sm font-medium text-blue-800 mb-2">🆔 KTP Pewaris:</p>
+              <img :src="getDocumentUrl('ktp', selectedForm.pewaris.ktpFileName)" alt="KTP Pewaris" class="w-full max-w-md mx-auto rounded-lg shadow-sm border border-gray-200" @error="$event.target.style.display='none'" />
+            </div>
+            
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div><span class="font-medium text-gray-700">Nama:</span> {{ selectedForm.pewaris.nama || '---' }}</div>
               <div><span class="font-medium text-gray-700">NIK:</span> {{ selectedForm.pewaris.nik || '---' }}</div>
@@ -294,10 +314,25 @@ const downloadDoc = (docName) => {
             </h3>
             <div class="space-y-4">
               <div v-for="(ahli, index) in selectedForm.ahliWarisList" :key="index" class="bg-gray-50 rounded-lg p-4">
-                <div class="flex items-center gap-2 mb-2">
+                <div class="flex items-center gap-2 mb-3">
                   <span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">{{ ahli.hubungan || 'Ahli Waris' }}</span>
-                  <span v-if="ahli.aktaFileName" class="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded">📄 Akta Kelahiran</span>
                 </div>
+                
+                <!-- Documents Display -->
+                <div class="space-y-3 mb-4">
+                  <!-- Birth Certificate -->
+                  <div v-if="ahli.aktaFileName" class="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p class="text-sm font-medium text-blue-800 mb-2">📄 Akta Kelahiran:</p>
+                    <img :src="getDocumentUrl('akta', ahli.aktaFileName)" alt="Akta Kelahiran" class="w-full max-w-sm mx-auto rounded-lg shadow-sm border border-gray-200" @error="$event.target.style.display='none'" />
+                  </div>
+                  
+                  <!-- KTP -->
+                  <div v-if="ahli.ktpFileName" class="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                    <p class="text-sm font-medium text-purple-800 mb-2">🆔 KTP:</p>
+                    <img :src="getDocumentUrl('ktp', ahli.ktpFileName)" alt="KTP Ahli Waris" class="w-full max-w-sm mx-auto rounded-lg shadow-sm border border-gray-200" @error="$event.target.style.display='none'" />
+                  </div>
+                </div>
+                
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div><span class="font-medium text-gray-700">Nama:</span> {{ ahli.nama || '---' }}</div>
                   <div><span class="font-medium text-gray-700">NIK:</span> {{ ahli.nik || '---' }}</div>
@@ -318,6 +353,16 @@ const downloadDoc = (docName) => {
             </h3>
             <div class="space-y-4">
               <div v-for="(saksi, index) in selectedForm.saksiList" :key="index" class="bg-gray-50 rounded-lg p-4">
+                <div class="mb-3">
+                  <span class="bg-purple-100 text-purple-800 text-xs font-semibold px-2 py-1 rounded">Saksi {{ index + 1 }}</span>
+                </div>
+                
+                <!-- KTP Display -->
+                <div v-if="saksi.ktpFileName" class="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                  <p class="text-sm font-medium text-purple-800 mb-2">🆔 KTP Saksi:</p>
+                  <img :src="getDocumentUrl('ktp', saksi.ktpFileName)" alt="KTP Saksi" class="w-full max-w-sm mx-auto rounded-lg shadow-sm border border-gray-200" @error="$event.target.style.display='none'" />
+                </div>
+                
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div><span class="font-medium text-gray-700">Nama:</span> {{ saksi.nama || '---' }}</div>
                   <div><span class="font-medium text-gray-700">NIK:</span> {{ saksi.nik || '---' }}</div>
@@ -336,16 +381,19 @@ const downloadDoc = (docName) => {
               </svg>
               Dokumen Pendukung ({{ selectedForm.dokumenPendukung.length }})
             </h3>
-            <div class="space-y-2">
-              <div v-for="(dok, index) in selectedForm.dokumenPendukung" :key="index" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div class="flex items-center gap-3">
-                  <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="space-y-4">
+              <div v-for="(dok, index) in selectedForm.dokumenPendukung" :key="index" class="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                <div class="flex items-center gap-3 mb-3">
+                  <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                   </svg>
-                  <span class="text-sm font-medium text-gray-700">{{ dok.nama || '---' }}</span>
+                  <span class="font-medium text-orange-800">{{ dok.nama || '---' }}</span>
+                  <span v-if="dok.uploaded" class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">✅ Terupload</span>
+                  <span v-else class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded">❌ Belum upload</span>
                 </div>
-                <span v-if="dok.uploaded" class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">✅ Terupload</span>
-                <span v-else class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded">❌ Belum upload</span>
+                <div v-if="dok.uploaded && dok.fileName">
+                  <img :src="getDocumentUrl('documents', dok.fileName)" :alt="dok.nama" class="w-full max-w-sm mx-auto rounded-lg shadow-sm border border-gray-200" @error="$event.target.style.display='none'" />
+                </div>
               </div>
             </div>
           </div>

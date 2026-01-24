@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 // Client-side OCR removed: we send file to server OCR endpoint instead
 import Swal from 'sweetalert2'
@@ -362,6 +362,47 @@ const loadSampleJson = () => {
 }
 
 // --- 2. LOGIKA OCR UTAMA ---
+// Helper function to fetch and display authenticated images
+const documentImageUrls = ref({})
+
+const getDocumentUrl = (fileType, fileName) => {
+  if (!fileName) return null
+  
+  const key = `${fileType}_${fileName}`
+  
+  // Return existing blob URL if already fetched
+  if (documentImageUrls.value[key]) {
+    return documentImageUrls.value[key]
+  }
+  
+  // Fetch the image with authentication
+  fetchAuthenticatedImage(fileType, fileName, key)
+  
+  // Return placeholder while loading
+  return null
+}
+
+const fetchAuthenticatedImage = async (fileType, fileName, key) => {
+  try {
+    const response = await api.get(`/upload/${fileType}/${fileName}`, {
+      responseType: 'blob',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    
+    const blob = response.data
+    const blobUrl = URL.createObjectURL(blob)
+    
+    // Store the blob URL reactively
+    documentImageUrls.value[key] = blobUrl
+  } catch (error) {
+    console.error('Failed to fetch authenticated image:', error)
+    // Set a placeholder or error state
+    documentImageUrls.value[key] = null
+  }
+}
+
 const handleScanKTP = async (event) => {
   const file = event.target.files[0]
   if (!file) return
@@ -377,6 +418,11 @@ const handleScanKTP = async (event) => {
     // Always send to OCR endpoint as requested
     const res = await api.post('/upload/ocr/ktp', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
     const parsed = resolveOcrPayload(res?.data)
+
+    // Store filename for immediate display
+    if (res?.data?.file_name) {
+      form.ktpFileName = res.data.file_name
+    }
 
     if (parsed) {
       applyOcrParsed(parsed)
@@ -419,6 +465,11 @@ const handlePasanganKtpUpload = async (event) => {
     const spouse = spouseEntry.value
     if (!spouse) return
     spouse.ktpFile = file
+
+    // Store filename for immediate display
+    if (res?.data?.file_name) {
+      spouse.ktpFileName = res.data.file_name
+    }
 
     if (parsed) {
       const { data } = unwrapOcrPayload(parsed)
@@ -468,6 +519,11 @@ const handleChildKtpUpload = async (event, childIndex) => {
     const parsed = resolveOcrPayload(res?.data)
 
     ahli.ktpFile = file
+
+    // Store filename for immediate display
+    if (res?.data?.file_name) {
+      ahli.ktpFileName = res.data.file_name
+    }
 
     if (parsed) {
       applyOcrToAhli(parsed, absoluteIndex)
@@ -859,10 +915,53 @@ const checkExistingForms = async () => {
   }
 }
 
+// Watchers to automatically fetch images when filenames become available
+watch(() => form.ktpFileName, (fileName) => {
+  if (fileName) fetchAuthenticatedImage('ktp', fileName, `ktp_${fileName}`)
+})
+
+watch(() => spouseEntry.value?.ktpFileName, (fileName) => {
+  if (fileName) fetchAuthenticatedImage('ktp', fileName, `ktp_${fileName}`)
+})
+
+watch(() => form.ahliWarisList, (ahliList) => {
+  ahliList.forEach((ahli, index) => {
+    if (ahli.ktpFileName) {
+      fetchAuthenticatedImage('ktp', ahli.ktpFileName, `ktp_${ahli.ktpFileName}`)
+    }
+    if (ahli.aktaFileName) {
+      fetchAuthenticatedImage('akta', ahli.aktaFileName, `akta_${ahli.aktaFileName}`)
+    }
+  })
+}, { deep: true })
+
+watch(() => form.saksiList, (saksiList) => {
+  saksiList.forEach((saksi, index) => {
+    if (saksi.ktpFileName) {
+      fetchAuthenticatedImage('ktp', saksi.ktpFileName, `ktp_${saksi.ktpFileName}`)
+    }
+  })
+}, { deep: true })
+
+watch(() => form.dokumenPendukung, (dokumenList) => {
+  dokumenList.forEach((dok, index) => {
+    if (dok.fileName) {
+      fetchAuthenticatedImage('documents', dok.fileName, `documents_${dok.fileName}`)
+    }
+  })
+}, { deep: true })
+
 // Lifecycle
 onMounted(() => {
   loadFormDraft()
   checkExistingForms()
+})
+
+// Cleanup blob URLs on unmount to prevent memory leaks
+onUnmounted(() => {
+  Object.values(documentImageUrls.value).forEach(url => {
+    if (url) URL.revokeObjectURL(url)
+  })
 })
 </script>
 
@@ -923,6 +1022,19 @@ onMounted(() => {
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <label class="block text-sm font-medium text-gray-700 mb-2">Scan KTP Pewaris</label>
           <input type="file" accept="image/*" @change="handleScanKTP" :disabled="isScanning" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer border border-dashed border-blue-300 rounded-lg p-3" />
+          
+          <!-- Display uploaded KTP immediately -->
+          <div v-if="form.ktpFileName" class="mt-4 p-3 bg-blue-100 rounded-lg border border-blue-300">
+            <p class="text-sm font-medium text-blue-800 mb-2">🆔 KTP Pewaris yang telah diupload:</p>
+            <div v-if="documentImageUrls[`ktp_${form.ktpFileName}`]" class="text-center">
+              <img :src="documentImageUrls[`ktp_${form.ktpFileName}`]" alt="KTP Pewaris" class="w-full max-w-sm mx-auto rounded-lg shadow-sm border border-gray-200" />
+            </div>
+            <div v-else class="text-center py-4">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p class="text-xs text-blue-600 mt-2">Memuat gambar...</p>
+            </div>
+          </div>
+          
           <div class="flex justify-between items-center mt-3">
             <p class="text-xs text-blue-600">💡 Tips: Gunakan foto KTP yang terang dan tegak lurus untuk hasil OCR terbaik</p>
             <div v-if="isScanning" class="text-xs text-blue-600 animate-pulse font-medium flex items-center gap-2">
@@ -1058,6 +1170,19 @@ onMounted(() => {
           <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-2">Scan KTP Pasangan</label>
             <input @change="handlePasanganKtpUpload" accept="image/*" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer border border-dashed border-blue-300 rounded-lg p-3" type="file" :disabled="isScanning" />
+            
+            <!-- Display uploaded KTP immediately -->
+            <div v-if="spouseEntry.ktpFileName" class="mt-4 p-3 bg-blue-100 rounded-lg border border-blue-300">
+              <p class="text-sm font-medium text-blue-800 mb-2">🆔 KTP Pasangan yang telah diupload:</p>
+              <div v-if="documentImageUrls[`ktp_${spouseEntry.ktpFileName}`]" class="text-center">
+                <img :src="documentImageUrls[`ktp_${spouseEntry.ktpFileName}`]" alt="KTP Pasangan" class="w-full max-w-sm mx-auto rounded-lg shadow-sm border border-gray-200" />
+              </div>
+              <div v-else class="text-center py-4">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p class="text-xs text-blue-600 mt-2">Memuat gambar...</p>
+              </div>
+            </div>
+            
             <div class="flex justify-between items-center mt-3">
               <p class="text-xs text-blue-600">💡 Upload untuk mengisi data otomatis (nama, NIK, dll)</p>
               <div v-if="isScanning" class="text-xs text-blue-600 animate-pulse font-medium flex items-center gap-2">
@@ -1194,6 +1319,19 @@ onMounted(() => {
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <label class="block text-sm font-medium text-gray-700 mb-2">Scan KTP Anak ke-{{ index + 1 }}</label>
               <input @change="e => handleChildKtpUpload(e, index)" accept="image/*" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer border border-dashed border-blue-300 rounded-lg p-3" type="file" :disabled="isScanning" />
+              
+              <!-- Display uploaded KTP immediately -->
+              <div v-if="ahli.ktpFileName" class="mt-4 p-3 bg-purple-100 rounded-lg border border-purple-300">
+                <p class="text-sm font-medium text-purple-800 mb-2">🆔 KTP Anak ke-{{ index + 1 }} yang telah diupload:</p>
+                <div v-if="documentImageUrls[`ktp_${ahli.ktpFileName}`]" class="text-center">
+                  <img :src="documentImageUrls[`ktp_${ahli.ktpFileName}`]" alt="KTP Anak" class="w-full max-w-sm mx-auto rounded-lg shadow-sm border border-gray-200" />
+                </div>
+                <div v-else class="text-center py-4">
+                  <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+                  <p class="text-xs text-purple-600 mt-2">Memuat gambar...</p>
+                </div>
+              </div>
+              
               <div class="flex justify-between items-center mt-3">
                 <p class="text-xs text-blue-600">💡 Upload KTP untuk mengisi data otomatis</p>
                 <div v-if="isScanning" class="text-xs text-blue-600 animate-pulse font-medium flex items-center gap-2">
@@ -1220,11 +1358,25 @@ onMounted(() => {
                   </div>
                 </div>
                 
-                <div v-else-if="ahli.aktaUploaded" class="flex items-center gap-2 text-xs text-green-600">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>✅ Akta kelahiran terupload: {{ ahli.aktaKelahiranFile?.name }}</span>
+                <div v-else-if="ahli.aktaUploaded" class="space-y-3">
+                  <div class="flex items-center gap-2 text-xs text-green-600">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>✅ Akta kelahiran terupload: {{ ahli.aktaKelahiranFile?.name }}</span>
+                  </div>
+                  
+                  <!-- Display uploaded birth certificate immediately -->
+                  <div v-if="ahli.aktaFileName" class="p-3 bg-blue-100 rounded-lg border border-blue-300">
+                    <p class="text-sm font-medium text-blue-800 mb-2">📄 Akta Kelahiran Anak ke-{{ index + 1 }}:</p>
+                    <div v-if="documentImageUrls[`akta_${ahli.aktaFileName}`]" class="text-center">
+                      <img :src="documentImageUrls[`akta_${ahli.aktaFileName}`]" alt="Akta Kelahiran" class="w-full max-w-sm mx-auto rounded-lg shadow-sm border border-gray-200" />
+                    </div>
+                    <div v-else class="text-center py-4">
+                      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p class="text-xs text-blue-600 mt-2">Memuat gambar...</p>
+                    </div>
+                  </div>
                 </div>
                 
                 <div v-else-if="ahli.aktaKelahiranFile && !ahli.aktaUploaded" class="flex items-center gap-2 text-xs text-red-600">
@@ -1532,11 +1684,25 @@ onMounted(() => {
                   </div>
                 </div>
                 
-                <div v-else-if="dokumen.uploaded" class="flex items-center gap-2 text-xs text-green-600">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  <span>Upload berhasil: {{ dokumen.file?.name }}</span>
+                <div v-else-if="dokumen.uploaded" class="space-y-2">
+                  <div class="flex items-center gap-2 text-xs text-green-600">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>Upload berhasil: {{ dokumen.file?.name }}</span>
+                  </div>
+                  
+                  <!-- Display uploaded document immediately -->
+                  <div v-if="dokumen.fileName" class="p-3 bg-orange-100 rounded-lg border border-orange-300">
+                    <p class="text-sm font-medium text-orange-800 mb-2">📄 {{ dokumen.nama || 'Dokumen' }}:</p>
+                    <div v-if="documentImageUrls[`documents_${dokumen.fileName}`]" class="text-center">
+                      <img :src="documentImageUrls[`documents_${dokumen.fileName}`]" :alt="dokumen.nama || 'Dokumen'" class="w-full max-w-sm mx-auto rounded-lg shadow-sm border border-gray-200" />
+                    </div>
+                    <div v-else class="text-center py-4">
+                      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto"></div>
+                      <p class="text-xs text-orange-600 mt-2">Memuat gambar...</p>
+                    </div>
+                  </div>
                 </div>
                 
                 <div v-else-if="dokumen.file && !dokumen.uploaded" class="flex items-center gap-2 text-xs text-red-600">
