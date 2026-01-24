@@ -725,191 +725,540 @@ onMounted(() => {
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
       
       <div v-if="currentStep === 1" class="space-y-6 animate-fade-in">
-        <h2 class="text-lg font-bold text-gray-800 border-b pb-2">Informasi Pewaris</h2>
+        <div class="border-b pb-3 mb-6">
+          <h2 class="text-xl font-bold text-gray-800 mb-1">Data Pewaris</h2>
+          <p class="text-sm text-gray-600">Isi data lengkap pewaris yang telah meninggal dunia</p>
+        </div>
         
-        <div class="bg-blue-50 border border-blue-100 rounded-lg p-6 text-center">
-            <p class="text-sm text-blue-800 font-medium mb-4">💡 Tips: Gunakan foto KTP yang terang dan tegak lurus.</p>
-            <label class="cursor-pointer inline-flex flex-col items-center px-6 py-3 border-2 border-dashed border-blue-300 rounded-lg bg-white hover:bg-blue-50 transition-colors">
-                <input type="file" accept="image/*" class="hidden" @change="handleScanKTP" :disabled="isScanning" />
-                <div v-if="!isScanning" class="text-blue-600 font-bold flex gap-2 items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    Scan KTP Otomatis (Beta)
-                </div>
-                <div v-else class="text-blue-600 animate-pulse font-medium">Sedang Memproses AI... {{ scanProgress }}%</div>
-            </label>
-            <div class="mt-3 flex flex-col gap-2">
-              <button @click="loadSampleJson" type="button" class="text-sm text-blue-600 underline">Isi dari JSON contoh</button>
-              <button @click="resetFormSection" type="button" class="text-sm text-gray-500 hover:text-gray-800">Kosongkan form untuk input KTP</button>
+        <!-- Scan KTP Pewaris -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Scan KTP Pewaris</label>
+          <input type="file" accept="image/*" @change="handleScanKTP" :disabled="isScanning" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer border border-dashed border-blue-300 rounded-lg p-3" />
+          <div class="flex justify-between items-center mt-3">
+            <p class="text-xs text-blue-600">💡 Tips: Gunakan foto KTP yang terang dan tegak lurus untuk hasil OCR terbaik</p>
+            <div v-if="isScanning" class="text-xs text-blue-600 animate-pulse font-medium flex items-center gap-2">
+              <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+              Memproses OCR... {{ scanProgress }}%
             </div>
+          </div>
+          <p class="text-xs text-gray-600 mt-2">{{ form.files.ktpPewaris ? 'File: ' + form.files.ktpPewaris.name : 'Belum ada file yang dipilih' }}</p>
+          <div class="mt-2 flex justify-start gap-4 text-xs">
+            <button @click="loadSampleJson" type="button" class="text-blue-600 hover:text-blue-800 underline transition-colors">Isi dari JSON contoh</button>
+            <button @click="resetFormSection" type="button" class="text-gray-500 hover:text-gray-700 underline transition-colors">Reset form</button>
+          </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">NIK Pewaris *</label><input v-model="form.pewaris.nik" type="number" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="16 Digit" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Nama Lengkap *</label><input v-model="form.pewaris.nama" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Hasil Scan..." /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Tanggal Meninggal *</label><input v-model="form.pewaris.tanggalMeninggal" type="date" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" />
-            <p class="text-xs text-orange-500 mt-1">* Wajib isi manual (tidak ada di KTP)</p>
+        <!-- Data Utama -->
+        <div class="bg-white border border-gray-200 rounded-xl p-6">
+          <h3 class="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Data Utama</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">NIK Pewaris *</label>
+              <input v-model="form.pewaris.nik" type="number" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Masukkan 16 digit NIK" />
             </div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Alamat Terakhir *</label><input v-model="form.pewaris.alamat" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Hasil Scan..." /></div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap *</label>
+              <input v-model="form.pewaris.nama" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Nama sesuai KTP" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Meninggal *</label>
+              <input v-model="form.pewaris.tanggalMeninggal" type="date" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" />
+              <p class="text-xs text-orange-600 mt-1">* Wajib diisi manual (tidak tersedia di KTP)</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Alamat Terakhir *</label>
+              <input v-model="form.pewaris.alamat" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Alamat lengkap" />
+            </div>
+          </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div><label class="block text-xs font-bold text-gray-500 mb-1">Agama</label><input v-model="form.pewaris.agama" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" /></div>
-          <div><label class="block text-xs font-bold text-gray-500 mb-1">Jenis Kelamin</label><input v-model="form.pewaris.jenisKelamin" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" /></div>
-          <div><label class="block text-xs font-bold text-gray-500 mb-1">Golongan Darah</label><input v-model="form.pewaris.golonganDarah" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" /></div>
-          <div><label class="block text-xs font-bold text-gray-500 mb-1">Pekerjaan</label><input v-model="form.pewaris.pekerjaan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" /></div>
-          <div><label class="block text-xs font-bold text-gray-500 mb-1">Kecamatan</label><input v-model="form.pewaris.kecamatan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" /></div>
-          <div><label class="block text-xs font-bold text-gray-500 mb-1">Kelurahan/Desa</label><input v-model="form.pewaris.kelurahanAtauDesa" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" /></div>
-          <div><label class="block text-xs font-bold text-gray-500 mb-1">Kewarganegaraan</label><input v-model="form.pewaris.kewarganegaraan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" /></div>
-          <div><label class="block text-xs font-bold text-gray-500 mb-1">Status Perkawinan</label><input v-model="form.pewaris.statusPerkawinan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" /></div>
+        <!-- Data Pribadi -->
+        <div class="bg-white border border-gray-200 rounded-xl p-6">
+          <h3 class="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Data Pribadi</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Agama</label>
+              <input v-model="form.pewaris.agama" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Islam, Kristen, dll" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Jenis Kelamin</label>
+              <select v-model="form.pewaris.jenisKelamin" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+                <option value="">Pilih jenis kelamin</option>
+                <option value="Laki-laki">Laki-laki</option>
+                <option value="Perempuan">Perempuan</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Golongan Darah</label>
+              <select v-model="form.pewaris.golonganDarah" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+                <option value="">Pilih golongan darah</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="AB">AB</option>
+                <option value="O">O</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Pekerjaan</label>
+              <input v-model="form.pewaris.pekerjaan" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Profesi/pekerjaan" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Status Perkawinan</label>
+              <select v-model="form.pewaris.statusPerkawinan" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+                <option value="">Pilih status</option>
+                <option value="Belum Kawin">Belum Kawin</option>
+                <option value="Kawin">Kawin</option>
+                <option value="Cerai Hidup">Cerai Hidup</option>
+                <option value="Cerai Mati">Cerai Mati</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Kewarganegaraan</label>
+              <input v-model="form.pewaris.kewarganegaraan" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="WNI" />
+            </div>
+          </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div><label class="block text-xs font-bold text-gray-500 mb-1">RT</label><input v-model="form.pewaris.rt" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" /></div>
-          <div><label class="block text-xs font-bold text-gray-500 mb-1">RW</label><input v-model="form.pewaris.rw" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" /></div>
-          <div><label class="block text-xs font-bold text-gray-500 mb-1">Tanggal Lahir</label><input v-model="form.pewaris.tanggalLahir" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="DD-MM-YYYY" /></div>
-          <div><label class="block text-xs font-bold text-gray-500 mb-1">Tempat Lahir</label><input v-model="form.pewaris.tempatLahir" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" /></div>
+        
+        <!-- Data Alamat -->
+        <div class="bg-white border border-gray-200 rounded-xl p-6">
+          <h3 class="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Data Kelahiran & Alamat</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Tempat Lahir</label>
+              <input v-model="form.pewaris.tempatLahir" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Kota kelahiran" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Lahir</label>
+              <input v-model="form.pewaris.tanggalLahir" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="DD-MM-YYYY" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Kecamatan</label>
+              <input v-model="form.pewaris.kecamatan" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Nama kecamatan" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Kelurahan/Desa</label>
+              <input v-model="form.pewaris.kelurahanAtauDesa" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Nama kelurahan/desa" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">RT</label>
+              <input v-model="form.pewaris.rt" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="000" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">RW</label>
+              <input v-model="form.pewaris.rw" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="000" />
+            </div>
+          </div>
         </div>
       </div>
 
       <div v-if="currentStep === 2" class="space-y-6 animate-fade-in">
-        <div class="space-y-3">
-          <div class="flex justify-between items-center border-b pb-2">
+        <div class="border-b pb-3 mb-6">
+          <h2 class="text-xl font-bold text-gray-800 mb-1">Data Ahli Waris</h2>
+          <p class="text-sm text-gray-600">Isi data pasangan dan anak-anak sebagai ahli waris</p>
+        </div>
+        
+        <!-- Data Pasangan -->
+        <div class="bg-white border border-gray-200 rounded-xl p-6">
+          <div class="flex justify-between items-center mb-4">
             <div>
-              <h2 class="text-lg font-bold text-gray-800">Data Pasangan</h2>
-              <p class="text-sm text-gray-500">Isi data pasangan terlebih dahulu supaya masuk ke bagian ahli waris sebelum menambahkan anak.</p>
+              <h3 class="text-lg font-semibold text-gray-800 mb-1">Data Pasangan</h3>
+              <p class="text-sm text-gray-600">Isi data pasangan terlebih dahulu sebelum menambahkan anak</p>
             </div>
-            <span class="text-xs text-gray-500">Opsional jika belum memiliki pasangan</span>
+            <span class="text-xs text-green-600 bg-green-50 px-3 py-1 rounded-full">Opsional</span>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          <!-- Scan KTP Pasangan -->
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Scan KTP Pasangan</label>
+            <input @change="handlePasanganKtpUpload" accept="image/*" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer border border-dashed border-blue-300 rounded-lg p-3" type="file" :disabled="isScanning" />
+            <div class="flex justify-between items-center mt-3">
+              <p class="text-xs text-blue-600">💡 Upload untuk mengisi data otomatis (nama, NIK, dll)</p>
+              <div v-if="isScanning" class="text-xs text-blue-600 animate-pulse font-medium flex items-center gap-2">
+                <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                Memproses OCR...
+              </div>
+            </div>
+            <p class="text-xs text-gray-600 mt-2">{{ spouseEntry.ktpFile ? 'File: ' + spouseEntry.ktpFile.name : 'Belum ada file yang dipilih' }}</p>
+          </div>
+          
+          <!-- Data Utama Pasangan -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
             <div>
-              <label class="block text-xs font-bold text-gray-500 mb-1">NIK Pasangan</label>
-              <input v-model="spouseEntry.nik" type="number" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="16 Digit" />
+              <label class="block text-sm font-medium text-gray-700 mb-2">NIK Pasangan</label>
+              <input v-model="spouseEntry.nik" type="number" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Masukkan 16 digit NIK" />
             </div>
             <div>
-              <label class="block text-xs font-bold text-gray-500 mb-1">Nama Lengkap</label>
-              <input v-model="spouseEntry.nama" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Nama sesuai KTP" />
+              <label class="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap</label>
+              <input v-model="spouseEntry.nama" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Nama sesuai KTP" />
             </div>
             <div>
-              <label class="block text-xs font-bold text-gray-500 mb-1">Tanggal Meninggal</label>
-              <input v-model="spouseEntry.tanggalMeninggal" type="date" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" />
-              <p class="text-xs text-gray-400 mt-1">Opsional, jika pasangan sudah meninggal</p>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Meninggal</label>
+              <input v-model="spouseEntry.tanggalMeninggal" type="date" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" />
+              <p class="text-xs text-gray-500 mt-1">Kosongkan jika masih hidup</p>
             </div>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <!-- Data Pribadi Pasangan -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
-              <label class="block text-xs font-bold text-gray-500 mb-1">Alamat Terakhir</label>
-              <input v-model="spouseEntry.alamat" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Alamat" />
+              <label class="block text-sm font-medium text-gray-700 mb-2">Alamat</label>
+              <input v-model="spouseEntry.alamat" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Alamat lengkap" />
             </div>
             <div>
-              <label class="block text-xs font-bold text-gray-500 mb-1">Agama</label>
-              <input v-model="spouseEntry.agama" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Agama" />
+              <label class="block text-sm font-medium text-gray-700 mb-2">Agama</label>
+              <input v-model="spouseEntry.agama" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Agama" />
             </div>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Jenis Kelamin</label><input v-model="spouseEntry.jenisKelamin" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Laki-laki / Perempuan" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Golongan Darah</label><input v-model="spouseEntry.golonganDarah" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="A / B / O / AB" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Pekerjaan</label><input v-model="spouseEntry.pekerjaan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Pekerjaan" /></div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Jenis Kelamin</label>
+              <select v-model="spouseEntry.jenisKelamin" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+                <option value="">Pilih jenis kelamin</option>
+                <option value="Laki-laki">Laki-laki</option>
+                <option value="Perempuan">Perempuan</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Golongan Darah</label>
+              <select v-model="spouseEntry.golonganDarah" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+                <option value="">Pilih golongan darah</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="AB">AB</option>
+                <option value="O">O</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Pekerjaan</label>
+              <input v-model="spouseEntry.pekerjaan" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Profesi/pekerjaan" />
+            </div>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Kecamatan</label><input v-model="spouseEntry.kecamatan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Kecamatan" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Kelurahan/Desa</label><input v-model="spouseEntry.kelurahanAtauDesa" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Kelurahan atau Desa" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Kewarganegaraan</label><input v-model="spouseEntry.kewarganegaraan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="WNI" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Status Perkawinan</label><input v-model="spouseEntry.statusPerkawinan" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Status" /></div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Kecamatan</label>
+              <input v-model="spouseEntry.kecamatan" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Nama kecamatan" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Kelurahan/Desa</label>
+              <input v-model="spouseEntry.kelurahanAtauDesa" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Kelurahan/desa" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Kewarganegaraan</label>
+              <input v-model="spouseEntry.kewarganegaraan" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="WNI" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Status Perkawinan</label>
+              <select v-model="spouseEntry.statusPerkawinan" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+                <option value="">Pilih status</option>
+                <option value="Belum Kawin">Belum Kawin</option>
+                <option value="Kawin">Kawin</option>
+                <option value="Cerai Hidup">Cerai Hidup</option>
+                <option value="Cerai Mati">Cerai Mati</option>
+              </select>
+            </div>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">RT</label><input v-model="spouseEntry.rt" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="RT" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">RW</label><input v-model="spouseEntry.rw" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="RW" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Tanggal Lahir</label><input v-model="spouseEntry.tanggalLahir" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="DD-MM-YYYY" /></div>
-            <div><label class="block text-xs font-bold text-gray-500 mb-1">Tempat Lahir</label><input v-model="spouseEntry.tempatLahir" type="text" class="w-full px-4 py-2 border rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Tempat Lahir" /></div>
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-gray-600 mb-1 block">Scan KTP Pasangan</label>
-            <input @change="handlePasanganKtpUpload" accept="image/*" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" type="file" :disabled="isScanning" />
-            <p class="text-xs text-gray-400 mt-1">Unggah untuk autofill data (nama, NIK, dll).</p>
-            <p class="text-xs text-gray-500 mt-1">{{ spouseEntry.ktpFile ? 'File terakhir: ' + spouseEntry.ktpFile.name : 'Belum mengunggah KTP pasangan' }}</p>
+          
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">RT</label>
+              <input v-model="spouseEntry.rt" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="000" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">RW</label>
+              <input v-model="spouseEntry.rw" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="000" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Lahir</label>
+              <input v-model="spouseEntry.tanggalLahir" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="DD-MM-YYYY" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Tempat Lahir</label>
+              <input v-model="spouseEntry.tempatLahir" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Kota kelahiran" />
+            </div>
           </div>
         </div>
-        <div class="border-t pt-4 space-y-4">
-          <div class="flex justify-between items-center">
+        
+        <!-- Data Anak-anak -->
+        <div class="bg-white border border-gray-200 rounded-xl p-6">
+          <div class="flex justify-between items-center mb-6">
             <div>
-              <h3 class="text-lg font-bold text-gray-800">Anak (sub dari pasangan)</h3>
-              <p class="text-sm text-gray-500">Setiap anak akan dianggap ahli waris dari pasangan yang Anda isi di atas.</p>
+              <h3 class="text-lg font-semibold text-gray-800 mb-1">Data Anak-anak</h3>
+              <p class="text-sm text-gray-600">Tambahkan data anak sebagai ahli waris</p>
             </div>
-            <button @click="addChild" class="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-200">+ Tambah Anak</button>
+            <button @click="addChild" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+              </svg>
+              Tambah Anak
+            </button>
           </div>
-          <div v-for="(ahli, index) in childList" :key="index" class="bg-gray-50 p-4 rounded-lg border relative">
-            <button v-if="childList.length > 1" @click="removeChild(index)" class="absolute top-2 right-2 text-red-400 hover:text-red-600">✕</button>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div><label class="text-xs font-bold text-gray-500">Nama *</label><input v-model="ahli.nama" class="w-full px-3 py-2 border rounded text-sm mt-1" /></div>
-              <div><label class="text-xs font-bold text-gray-500">NIK *</label><input v-model="ahli.nik" type="number" class="w-full px-3 py-2 border rounded text-sm mt-1" /></div>
-              <div><label class="text-xs font-bold text-gray-500">Hubungan *</label><select v-model="ahli.hubungan" class="w-full px-3 py-2 border rounded text-sm mt-1 bg-white"><option disabled value="">Pilih</option><option>Istri/Suami</option><option>Anak Kandung</option><option>Cucu</option><option>Saudara Kandung</option></select></div>
+          <div v-for="(ahli, index) in childList" :key="index" class="bg-gray-50 border border-gray-200 rounded-xl p-6 relative">
+            <button v-if="childList.length > 1" @click="removeChild(index)" class="absolute top-4 right-4 text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+            
+            <h4 class="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Anak ke-{{ index + 1 }}</h4>
+            
+            <!-- Scan KTP Anak -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Scan KTP Anak ke-{{ index + 1 }}</label>
+              <input @change="e => handleChildKtpUpload(e, index)" accept="image/*" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer border border-dashed border-blue-300 rounded-lg p-3" type="file" :disabled="isScanning" />
+              <div class="flex justify-between items-center mt-3">
+                <p class="text-xs text-blue-600">💡 Upload KTP untuk mengisi data otomatis</p>
+                <div v-if="isScanning" class="text-xs text-blue-600 animate-pulse font-medium flex items-center gap-2">
+                  <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                  Memproses OCR...
+                </div>
+              </div>
+              <p class="text-xs text-gray-600 mt-2">{{ ahli.ktpFile ? 'File: ' + ahli.ktpFile.name : 'Belum ada file yang dipilih' }}</p>
             </div>
-            <div class="mt-4">
-              <label class="text-xs font-semibold text-gray-600 mb-1 block">Scan KTP Ahli Waris</label>
-              <input @change="e => handleChildKtpUpload(e, index)" accept="image/*" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" type="file" :disabled="isScanning" />
-              <p class="text-xs text-gray-400 mt-1">Upload KTP untuk mengisi data otomatis.</p>
-              <p class="text-xs text-gray-500 mt-1">{{ ahli.ktpFile ? 'File terakhir: ' + ahli.ktpFile.name : 'Belum mengunggah KTP untuk OCR' }}</p>
-            </div>
-            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <!-- Data Utama Anak -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               <div>
-                <label class="text-xs font-bold text-gray-500 mb-1 block">Alamat</label>
-                <input v-model="ahli.alamat" class="w-full px-3 py-2 border rounded text-sm" placeholder="Alamat sesuai KTP" />
+                <label class="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap *</label>
+                <input v-model="ahli.nama" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Nama sesuai KTP" />
               </div>
               <div>
-                <label class="text-xs font-bold text-gray-500 mb-1 block">Tanggal Meninggal</label>
-                <input v-model="ahli.tanggalMeninggal" type="date" class="w-full px-3 py-2 border rounded text-sm" />
-                <p class="text-xs text-gray-400 mt-1">Opsional jika ahli waris sudah meninggal</p>
+                <label class="block text-sm font-medium text-gray-700 mb-2">NIK *</label>
+                <input v-model="ahli.nik" type="number" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="16 digit NIK" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Hubungan *</label>
+                <select v-model="ahli.hubungan" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+                  <option disabled value="">Pilih hubungan</option>
+                  <option>Anak Kandung</option>
+                  <option>Anak Tiri</option>
+                  <option>Anak Angkat</option>
+                  <option>Cucu</option>
+                </select>
               </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-              <div><label class="text-xs font-bold text-gray-500 mb-1 block">Agama</label><input v-model="ahli.agama" class="w-full px-3 py-2 border rounded text-sm" placeholder="Agama" /></div>
-              <div><label class="text-xs font-bold text-gray-500 mb-1 block">Jenis Kelamin</label><input v-model="ahli.jenisKelamin" class="w-full px-3 py-2 border rounded text-sm" placeholder="Laki-laki / Perempuan" /></div>
-              <div><label class="text-xs font-bold text-gray-500 mb-1 block">Golongan Darah</label><input v-model="ahli.golonganDarah" class="w-full px-3 py-2 border rounded text-sm" placeholder="A / B / O / AB" /></div>
+            
+            <!-- Data Alamat Anak -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Alamat</label>
+                <input v-model="ahli.alamat" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Alamat lengkap" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Meninggal</label>
+                <input v-model="ahli.tanggalMeninggal" type="date" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" />
+                <p class="text-xs text-gray-500 mt-1">Kosongkan jika masih hidup</p>
+              </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-              <div><label class="text-xs font-bold text-gray-500 mb-1 block">Pekerjaan</label><input v-model="ahli.pekerjaan" class="w-full px-3 py-2 border rounded text-sm" placeholder="Pekerjaan" /></div>
-              <div><label class="text-xs font-bold text-gray-500 mb-1 block">Kecamatan</label><input v-model="ahli.kecamatan" class="w-full px-3 py-2 border rounded text-sm" placeholder="Kecamatan" /></div>
-              <div><label class="text-xs font-bold text-gray-500 mb-1 block">Kelurahan/Desa</label><input v-model="ahli.kelurahanAtauDesa" class="w-full px-3 py-2 border rounded text-sm" placeholder="Kelurahan atau Desa" /></div>
+            
+            <!-- Data Pribadi Anak -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Agama</label>
+                <input v-model="ahli.agama" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Agama" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Jenis Kelamin</label>
+                <select v-model="ahli.jenisKelamin" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+                  <option value="">Pilih jenis kelamin</option>
+                  <option value="Laki-laki">Laki-laki</option>
+                  <option value="Perempuan">Perempuan</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Golongan Darah</label>
+                <select v-model="ahli.golonganDarah" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+                  <option value="">Pilih golongan darah</option>
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="AB">AB</option>
+                  <option value="O">O</option>
+                </select>
+              </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-              <div><label class="text-xs font-bold text-gray-500 mb-1 block">Kewarganegaraan</label><input v-model="ahli.kewarganegaraan" class="w-full px-3 py-2 border rounded text-sm" placeholder="WNI" /></div>
-              <div><label class="text-xs font-bold text-gray-500 mb-1 block">Status Perkawinan</label><input v-model="ahli.statusPerkawinan" class="w-full px-3 py-2 border rounded text-sm" placeholder="Status" /></div>
-              <div></div>
+            
+            <!-- Data Detail Anak -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Pekerjaan</label>
+                <input v-model="ahli.pekerjaan" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Profesi/pekerjaan" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Kecamatan</label>
+                <input v-model="ahli.kecamatan" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Nama kecamatan" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Kelurahan/Desa</label>
+                <input v-model="ahli.kelurahanAtauDesa" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Kelurahan/desa" />
+              </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
-              <div><label class="text-xs font-bold text-gray-500 mb-1 block">RT</label><input v-model="ahli.rt" class="w-full px-3 py-2 border rounded text-sm" placeholder="RT" /></div>
-              <div><label class="text-xs font-bold text-gray-500 mb-1 block">RW</label><input v-model="ahli.rw" class="w-full px-3 py-2 border rounded text-sm" placeholder="RW" /></div>
-              <div><label class="text-xs font-bold text-gray-500 mb-1 block">Tanggal Lahir</label><input v-model="ahli.tanggalLahir" class="w-full px-3 py-2 border rounded text-sm" placeholder="DD-MM-YYYY" /></div>
-              <div><label class="text-xs font-bold text-gray-500 mb-1 block">Tempat Lahir</label><input v-model="ahli.tempatLahir" class="w-full px-3 py-2 border rounded text-sm" placeholder="Tempat Lahir" /></div>
+            
+            <!-- Data Lokasi dan Kelahiran -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Kewarganegaraan</label>
+                  <input v-model="ahli.kewarganegaraan" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="WNI" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Status Perkawinan</label>
+                  <select v-model="ahli.statusPerkawinan" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+                    <option value="">Pilih status</option>
+                    <option value="Belum Kawin">Belum Kawin</option>
+                    <option value="Kawin">Kawin</option>
+                    <option value="Cerai Hidup">Cerai Hidup</option>
+                    <option value="Cerai Mati">Cerai Mati</option>
+                  </select>
+                </div>
+                <div></div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">RT</label>
+                  <input v-model="ahli.rt" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="000" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">RW</label>
+                  <input v-model="ahli.rw" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="000" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Lahir</label>
+                  <input v-model="ahli.tanggalLahir" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="DD-MM-YYYY" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Tempat Lahir</label>
+                  <input v-model="ahli.tempatLahir" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Kota kelahiran" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <div v-if="currentStep === 3" class="space-y-6 animate-fade-in">
-        <div class="flex justify-between items-center border-b pb-2"><h2 class="text-lg font-bold text-gray-800">Harta Warisan</h2><button @click="addHarta" class="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-200">+ Tambah</button></div>
-        <div v-for="(harta, index) in form.hartaList" :key="index" class="bg-gray-50 p-4 rounded-lg border relative">
-            <button v-if="form.hartaList.length > 1" @click="removeHarta(index)" class="absolute top-2 right-2 text-red-400 hover:text-red-600">✕</button>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div><label class="text-xs font-bold text-gray-500">Jenis *</label><select v-model="harta.jenis" class="w-full px-3 py-2 border rounded text-sm mt-1 bg-white"><option disabled value="">Pilih</option><option>Tanah/Bangunan</option><option>Kendaraan</option><option>Tabungan</option><option>Lainnya</option></select></div>
-                <div><label class="text-xs font-bold text-gray-500">Keterangan *</label><input v-model="harta.deskripsi" placeholder="Lokasi/Merk" class="w-full px-3 py-2 border rounded text-sm mt-1" /></div>
-                <div><label class="text-xs font-bold text-gray-500">No. Bukti</label><input v-model="harta.noSurat" placeholder="Sertifikat/BPKB" class="w-full px-3 py-2 border rounded text-sm mt-1" /></div>
+        <div class="border-b pb-3 mb-6">
+          <div class="flex justify-between items-center">
+            <div>
+              <h2 class="text-xl font-bold text-gray-800 mb-1">Harta Warisan</h2>
+              <p class="text-sm text-gray-600">Daftar seluruh aset dan harta yang akan diwariskan</p>
             </div>
+            <button @click="addHarta" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+              </svg>
+              Tambah Harta
+            </button>
+          </div>
+        </div>
+        
+        <div v-for="(harta, index) in form.hartaList" :key="index" class="bg-white border border-gray-200 rounded-xl p-6 relative">
+          <button v-if="form.hartaList.length > 1" @click="removeHarta(index)" class="absolute top-4 right-4 text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+          <h4 class="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Harta ke-{{ index + 1 }}</h4>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Jenis Harta *</label>
+              <select v-model="harta.jenis" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+                <option disabled value="">Pilih jenis harta</option>
+                <option>Tanah/Bangunan</option>
+                <option>Kendaraan</option>
+                <option>Tabungan</option>
+                <option>Emas/Perhiasan</option>
+                <option>Lainnya</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Keterangan *</label>
+              <input v-model="harta.deskripsi" placeholder="Lokasi/Merk/Deskripsi detail" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Nomor Bukti</label>
+              <input v-model="harta.noSurat" placeholder="Sertifikat/BPKB/No. Rekening" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" />
+            </div>
+          </div>
         </div>
       </div>
 
       <div v-if="currentStep === 4" class="space-y-6 animate-fade-in">
-        <h2 class="text-lg font-bold text-gray-800 border-b pb-2">Dokumen Pendukung</h2>
-        <div class="space-y-4">
-            <div><label class="text-sm font-medium">Scan KTP Pewaris (Asli) *</label><input @change="e => handleFileUpload(e, 'ktpPewaris')" type="file" class="block w-full text-sm text-slate-500 mt-1 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/></div>
-            <div><label class="text-sm font-medium">Kartu Keluarga (KK) *</label><input @change="e => handleFileUpload(e, 'kk')" type="file" class="block w-full text-sm text-slate-500 mt-1 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/></div>
-            <div><label class="text-sm font-medium">Surat Kematian *</label><input @change="e => handleFileUpload(e, 'suratKematian')" type="file" class="block w-full text-sm text-slate-500 mt-1 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/></div>
+        <div class="border-b pb-3 mb-6">
+          <h2 class="text-xl font-bold text-gray-800 mb-1">Dokumen Pendukung</h2>
+          <p class="text-sm text-gray-600">Upload dokumen-dokumen yang diperlukan untuk pengajuan waris</p>
+        </div>
+        
+        <div class="grid grid-cols-1 gap-6">
+          <div class="bg-white border border-gray-200 rounded-xl p-6">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-800">Scan KTP Pewaris (Asli) *</label>
+                <p class="text-xs text-gray-600">Upload fotokopi KTP pewaris yang telah meninggal</p>
+              </div>
+            </div>
+            <input @change="e => handleFileUpload(e, 'ktpPewaris')" type="file" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer border border-dashed border-gray-300 rounded-lg p-4"/>
+            <p class="text-xs text-gray-500 mt-2">{{ form.files.ktpPewaris ? 'File: ' + form.files.ktpPewaris.name : 'Belum ada file yang dipilih' }}</p>
+          </div>
+          
+          <div class="bg-white border border-gray-200 rounded-xl p-6">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-800">Kartu Keluarga (KK) *</label>
+                <p class="text-xs text-gray-600">Upload fotokopi Kartu Keluarga yang masih berlaku</p>
+              </div>
+            </div>
+            <input @change="e => handleFileUpload(e, 'kk')" type="file" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer border border-dashed border-gray-300 rounded-lg p-4"/>
+            <p class="text-xs text-gray-500 mt-2">{{ form.files.kk ? 'File: ' + form.files.kk.name : 'Belum ada file yang dipilih' }}</p>
+          </div>
+          
+          <div class="bg-white border border-gray-200 rounded-xl p-6">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-800">Surat Kematian *</label>
+                <p class="text-xs text-gray-600">Upload surat kematian dari instansi berwenang</p>
+              </div>
+            </div>
+            <input @change="e => handleFileUpload(e, 'suratKematian')" type="file" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer border border-dashed border-gray-300 rounded-lg p-4"/>
+            <p class="text-xs text-gray-500 mt-2">{{ form.files.suratKematian ? 'File: ' + form.files.suratKematian.name : 'Belum ada file yang dipilih' }}</p>
+          </div>
         </div>
       </div>
 
-      <div class="mt-8 flex justify-between pt-6 border-t border-gray-100">
-        <button v-if="currentStep > 1" @click="prevStep" class="px-6 py-2 border rounded-lg hover:bg-gray-50 transition-colors">Kembali</button>
+      <div class="mt-8 flex justify-between items-center pt-6 border-t border-gray-200">
+        <button v-if="currentStep > 1" @click="prevStep" class="flex items-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+          </svg>
+          Kembali
+        </button>
         <div v-else></div> 
-        <button v-if="currentStep < 4" @click="nextStep" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-lg">Lanjut</button>
-        <button v-else @click="submitForm" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-lg">Kirim Permohonan</button>
+        <button v-if="currentStep < 4" @click="nextStep" class="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-lg transition-colors font-medium">
+          Lanjut
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </button>
+        <button v-else @click="submitForm" class="flex items-center gap-2 px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-lg transition-colors font-medium">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+          </svg>
+          Kirim Permohonan
+        </button>
       </div>
 
       </div>
