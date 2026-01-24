@@ -13,7 +13,7 @@ const isBrowser = typeof window !== 'undefined'
 
 // --- STATE ---
 const currentStep = ref(1)
-const steps = ['Data Pewaris', 'Data Ahli Waris', 'Harta Warisan', 'Upload Dokumen']
+const steps = ['Data Pewaris', 'Data Ahli Waris', 'Data Saksi', 'Upload Dokumen']
 const progressWidth = computed(() => ((currentStep.value - 1) / (steps.length - 1)) * 100)
 
 const isApproved = ref(false) // Track apakah user sudah klik approval
@@ -54,12 +54,12 @@ const assignBasePersonFields = (target) => {
 
 const spouseTemplate = () => ({ ...basePersonFields(), hubungan: 'Pasangan', ktpFile: null })
 const newEmptyAhli = () => ({ ...basePersonFields(), hubungan: 'Anak Kandung', ktpFile: null })
-const newEmptyHarta = () => ({ jenis: '', deskripsi: '', noSurat: '' })
+const newEmptySaksi = () => ({ ...basePersonFields(), hubungan: 'Saksi', ktpFile: null })
 
 const form = reactive({
   pewaris: basePersonFields(),
   ahliWarisList: [spouseTemplate(), newEmptyAhli()],
-  hartaList: [newEmptyHarta()],
+  saksiList: [newEmptySaksi(), newEmptySaksi()],
   files: { ktpPewaris: null, kk: null, suratKematian: null }
 })
 
@@ -72,7 +72,10 @@ const getFormSnapshot = () => ({
     const { ktpFile, ...rest } = ahli
     return { ...rest, ktpFile: null }
   }),
-  hartaList: form.hartaList.map((harta) => ({ ...harta })),
+  saksiList: form.saksiList.map((saksi) => {
+    const { ktpFile, ...rest } = saksi
+    return { ...rest, ktpFile: null }
+  }),
   currentStep: currentStep.value
 })
 
@@ -105,13 +108,13 @@ const loadFormDraft = () => {
       if (normalized.length < 2) normalized.push(newEmptyAhli())
       form.ahliWarisList.splice(0, form.ahliWarisList.length, ...normalized)
     }
-    if (Array.isArray(draft.hartaList) && draft.hartaList.length > 0) {
-      const mapped = draft.hartaList.map((item) => ({
-        jenis: item.jenis || '',
-        deskripsi: item.deskripsi || '',
-        noSurat: item.noSurat || ''
-      }))
-      form.hartaList.splice(0, form.hartaList.length, ...mapped)
+    if (Array.isArray(draft.saksiList) && draft.saksiList.length > 0) {
+      const mapped = draft.saksiList.map((item) => {
+        const template = newEmptySaksi()
+        return { ...template, ...item, ktpFile: null }
+      })
+      if (mapped.length < 2) mapped.push(newEmptySaksi())
+      form.saksiList.splice(0, form.saksiList.length, ...mapped)
     }
     if (typeof draft.currentStep === 'number' && draft.currentStep >= 1 && draft.currentStep <= steps.length) {
       currentStep.value = draft.currentStep
@@ -128,7 +131,7 @@ watch(currentStep, () => persistFormDraft())
 const resetFormSection = () => {
   assignBasePersonFields(form.pewaris)
   form.ahliWarisList.splice(0, form.ahliWarisList.length, spouseTemplate(), newEmptyAhli())
-  form.hartaList.splice(0, form.hartaList.length, newEmptyHarta())
+  form.saksiList.splice(0, form.saksiList.length, newEmptySaksi(), newEmptySaksi())
   form.files.ktpPewaris = null
   form.files.kk = null
   form.files.suratKematian = null
@@ -543,10 +546,57 @@ const removeChild = (childIndex) => {
   }
   form.ahliWarisList.splice(childIndex + 1, 1)
 }
-const addHarta = () => { form.hartaList.push(newEmptyHarta()) }
-const removeHarta = (index) => {
-  if (form.hartaList.length > 1) form.hartaList.splice(index, 1)
-  else Swal.fire('Gagal', 'Minimal 1 Aset.', 'warning')
+const addSaksi = () => { form.saksiList.push(newEmptySaksi()) }
+const removeSaksi = (index) => {
+  if (form.saksiList.length > 1) form.saksiList.splice(index, 1)
+  else Swal.fire('Gagal', 'Minimal 1 Saksi.', 'warning')
+}
+
+const handleSaksiKtpUpload = async (event, index) => {
+  const file = event.target.files[0]
+  if (!file) return
+  const saksi = form.saksiList[index]
+  if (!saksi) return
+
+  if (file.size > 5 * 1024 * 1024) {
+    Swal.fire('File Terlalu Besar', 'Maksimal 5MB', 'warning')
+    event.target.value = ''
+    return
+  }
+
+  isScanning.value = true
+  scanProgress.value = 0
+
+  try {
+    Swal.fire({ title: 'Mengunggah dan memproses OCR...', didOpen: () => Swal.showLoading() })
+    const fd = new FormData()
+    fd.append('file', file)
+
+    const res = await api.post('/upload/ocr/ktp', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+    const parsed = resolveOcrPayload(res?.data)
+
+    saksi.ktpFile = file
+
+    if (parsed) {
+      const { data } = unwrapOcrPayload(parsed)
+      if (data) {
+        applyOcrToEntity(saksi, data)
+        Swal.fire({ icon: 'success', title: 'OCR Sukses', text: 'Data saksi terisi otomatis.' })
+      } else {
+        Swal.fire({ icon: 'info', title: 'OCR Tidak Tersedia', text: 'File tersimpan, silakan isi manual.' })
+      }
+    } else {
+      Swal.fire({ icon: 'info', title: 'OCR Tidak Tersedia', text: 'File tersimpan, silakan isi manual.' })
+    }
+  } catch (error) {
+    console.error('OCR upload failed for saksi', error)
+    Swal.fire({ icon: 'error', title: 'Gagal Mengunggah', text: 'Terjadi kesalahan saat memproses OCR.' })
+    saksi.ktpFile = file
+  } finally {
+    try { Swal.close() } catch (e) {}
+    isScanning.value = false
+    event.target.value = ''
+  }
 }
 
 // --- VALIDASI & NAVIGASI ---
@@ -566,8 +616,10 @@ const validateStep2 = () => {
   return true
 }
 const validateStep3 = () => {
-  for (let i = 0; i < form.hartaList.length; i++) {
-    if (!form.hartaList[i].jenis || !form.hartaList[i].deskripsi) { Swal.fire('Data Kurang', `Harta ke-${i + 1} belum lengkap.`, 'warning'); return false }
+  for (let i = 0; i < form.saksiList.length; i++) {
+    const saksi = form.saksiList[i]
+    if (!saksi.nama || !saksi.nik) { Swal.fire('Data Kurang', `Saksi ke-${i + 1} belum lengkap (nama dan NIK wajib).`, 'warning'); return false }
+    if (String(saksi.nik).length !== 16) { Swal.fire('Format Salah', `NIK Saksi ke-${i + 1} harus 16 digit.`, 'warning'); return false }
   }
   return true
 }
@@ -1139,44 +1191,114 @@ onMounted(() => {
         <div class="border-b pb-3 mb-6">
           <div class="flex justify-between items-center">
             <div>
-              <h2 class="text-xl font-bold text-gray-800 mb-1">Harta Warisan</h2>
-              <p class="text-sm text-gray-600">Daftar seluruh aset dan harta yang akan diwariskan</p>
+              <h2 class="text-xl font-bold text-gray-800 mb-1">Data Saksi</h2>
+              <p class="text-sm text-gray-600">Tambahkan data saksi-saksi dalam pengajuan waris</p>
             </div>
-            <button @click="addHarta" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
+            <button @click="addSaksi" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
               </svg>
-              Tambah Harta
+              Tambah Saksi
             </button>
           </div>
         </div>
         
-        <div v-for="(harta, index) in form.hartaList" :key="index" class="bg-white border border-gray-200 rounded-xl p-6 relative">
-          <button v-if="form.hartaList.length > 1" @click="removeHarta(index)" class="absolute top-4 right-4 text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors">
+        <div v-for="(saksi, index) in form.saksiList" :key="index" class="bg-white border border-gray-200 rounded-xl p-6 relative">
+          <button v-if="form.saksiList.length > 1" @click="removeSaksi(index)" class="absolute top-4 right-4 text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
           </button>
-          <h4 class="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Harta ke-{{ index + 1 }}</h4>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          <h4 class="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Saksi ke-{{ index + 1 }}</h4>
+          
+          <!-- Scan KTP Saksi -->
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Scan KTP Saksi ke-{{ index + 1 }}</label>
+            <input @change="e => handleSaksiKtpUpload(e, index)" accept="image/*" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer border border-dashed border-blue-300 rounded-lg p-3" type="file" :disabled="isScanning" />
+            <div class="flex justify-between items-center mt-3">
+              <p class="text-xs text-blue-600">💡 Upload KTP untuk mengisi data otomatis</p>
+              <div v-if="isScanning" class="text-xs text-blue-600 animate-pulse font-medium flex items-center gap-2">
+                <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                Memproses OCR...
+              </div>
+            </div>
+            <p class="text-xs text-gray-600 mt-2">{{ saksi.ktpFile ? 'File: ' + saksi.ktpFile.name : 'Belum ada file yang dipilih' }}</p>
+          </div>
+          
+          <!-- Data Utama Saksi -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Jenis Harta *</label>
-              <select v-model="harta.jenis" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
-                <option disabled value="">Pilih jenis harta</option>
-                <option>Tanah/Bangunan</option>
-                <option>Kendaraan</option>
-                <option>Tabungan</option>
-                <option>Emas/Perhiasan</option>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap *</label>
+              <input v-model="saksi.nama" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Nama sesuai KTP" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">NIK *</label>
+              <input v-model="saksi.nik" type="number" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="16 digit NIK" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Hubungan dengan Pewaris</label>
+              <select v-model="saksi.hubungan" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+                <option disabled value="">Pilih hubungan</option>
+                <option>Tetangga</option>
+                <option>Teman</option>
+                <option>Kerabat</option>
+                <option>Rekan Kerja</option>
+                <option>Tokoh Masyarakat</option>
                 <option>Lainnya</option>
               </select>
             </div>
+          </div>
+          
+          <!-- Data Alamat Saksi -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Keterangan *</label>
-              <input v-model="harta.deskripsi" placeholder="Lokasi/Merk/Deskripsi detail" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" />
+              <label class="block text-sm font-medium text-gray-700 mb-2">Alamat</label>
+              <input v-model="saksi.alamat" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Alamat lengkap" />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Nomor Bukti</label>
-              <input v-model="harta.noSurat" placeholder="Sertifikat/BPKB/No. Rekening" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" />
+              <label class="block text-sm font-medium text-gray-700 mb-2">Pekerjaan</label>
+              <input v-model="saksi.pekerjaan" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Profesi/pekerjaan" />
+            </div>
+          </div>
+          
+          <!-- Data Detail Saksi -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Agama</label>
+              <input v-model="saksi.agama" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Agama" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Jenis Kelamin</label>
+              <select v-model="saksi.jenisKelamin" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white">
+                <option value="">Pilih jenis kelamin</option>
+                <option value="Laki-laki">Laki-laki</option>
+                <option value="Perempuan">Perempuan</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Tempat Lahir</label>
+              <input v-model="saksi.tempatLahir" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Kota kelahiran" />
+            </div>
+          </div>
+          
+          <!-- Data Lokasi Saksi -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Kecamatan</label>
+              <input v-model="saksi.kecamatan" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Nama kecamatan" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Kelurahan/Desa</label>
+              <input v-model="saksi.kelurahanAtauDesa" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Kelurahan/desa" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">RT</label>
+              <input v-model="saksi.rt" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="000" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">RW</label>
+              <input v-model="saksi.rw" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="000" />
             </div>
           </div>
         </div>
