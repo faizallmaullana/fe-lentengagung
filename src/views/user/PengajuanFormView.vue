@@ -60,7 +60,7 @@ const form = reactive({
   pewaris: basePersonFields(),
   ahliWarisList: [spouseTemplate(), newEmptyAhli()],
   saksiList: [newEmptySaksi(), newEmptySaksi()],
-  files: { ktpPewaris: null, kk: null, suratKematian: null }
+  dokumenPendukung: []
 })
 
 const spouseEntry = computed(() => form.ahliWarisList[0])
@@ -75,6 +75,10 @@ const getFormSnapshot = () => ({
   saksiList: form.saksiList.map((saksi) => {
     const { ktpFile, ...rest } = saksi
     return { ...rest, ktpFile: null }
+  }),
+  dokumenPendukung: form.dokumenPendukung.map((dok) => {
+    const { file, ...rest } = dok
+    return { ...rest, file: null }
   }),
   currentStep: currentStep.value
 })
@@ -132,9 +136,7 @@ const resetFormSection = () => {
   assignBasePersonFields(form.pewaris)
   form.ahliWarisList.splice(0, form.ahliWarisList.length, spouseTemplate(), newEmptyAhli())
   form.saksiList.splice(0, form.saksiList.length, newEmptySaksi(), newEmptySaksi())
-  form.files.ktpPewaris = null
-  form.files.kk = null
-  form.files.suratKematian = null
+  form.dokumenPendukung = []
   parsedPreview.value = null
   preparedJson.value = null
   submissionPayload.value = null
@@ -376,9 +378,6 @@ const handleScanKTP = async (event) => {
     const res = await api.post('/upload/ocr/ktp', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
     const parsed = resolveOcrPayload(res?.data)
 
-    // Simpan file reference so user can still submit
-    form.files.ktpPewaris = file
-
     if (parsed) {
       applyOcrParsed(parsed)
       Swal.fire({ icon: 'success', title: 'OCR Sukses', text: 'Data KTP terisi otomatis. Mohon periksa kembali.' })
@@ -388,7 +387,6 @@ const handleScanKTP = async (event) => {
   } catch (error) {
     console.error('OCR upload failed', error)
     Swal.fire({ icon: 'error', title: 'Gagal Mengunggah', text: 'Terjadi kesalahan saat mengunggah atau memproses OCR.' })
-    form.files.ktpPewaris = file
   } finally {
     try { Swal.close() } catch (e) {}
     isScanning.value = false
@@ -396,56 +394,6 @@ const handleScanKTP = async (event) => {
 }
 
 // --- HELPER LAIN (Sama seperti sebelumnya) ---
-const handleFileUpload = async (event, key) => {
-  const file = event.target.files[0]
-  if (!file) return
-
-  isScanning.value = true
-  scanProgress.value = 0
-
-  if (file.size > 5 * 1024 * 1024) {
-    Swal.fire('File Terlalu Besar', 'Maksimal 5MB', 'warning')
-    event.target.value = '' 
-    isScanning.value = false
-    return
-  }
-
-  // Jika KTP pewaris: upload ke endpoint OCR dan isi form otomatis jika memungkinkan
-  if (key === 'ktpPewaris') {
-    try {
-      Swal.fire({ title: 'Mengunggah dan memproses OCR...', didOpen: () => Swal.showLoading() })
-      const fd = new FormData()
-      fd.append('file', file)
-
-      const res = await api.post('/upload/ocr/ktp', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      const parsed = resolveOcrPayload(res?.data)
-
-      // Simpan file reference and/or filename
-      form.files[key] = file
-
-      if (parsed) {
-        applyOcrParsed(parsed)
-        Swal.fire({ icon: 'success', title: 'OCR Sukses', text: 'Data KTP terisi otomatis. Mohon periksa kembali.' })
-      } else {
-        Swal.fire({ icon: 'info', title: 'OCR Tidak Tersedia', text: 'File tersimpan, silakan isi data manual.' })
-      }
-    } catch (error) {
-      console.error('OCR upload failed', error)
-      Swal.fire({ icon: 'error', title: 'Gagal Mengunggah', text: 'Terjadi kesalahan saat mengunggah atau memproses OCR.' })
-      // simpan file locally so user can still submit
-      form.files[key] = file
-    } finally {
-      try { Swal.close() } catch (e) {}
-      isScanning.value = false
-    }
-
-    return
-  }
-
-  // Default: hanya simpan file
-  form.files[key] = file
-  isScanning.value = false
-}
 
 const handlePasanganKtpUpload = async (event) => {
   const file = event.target.files[0]
@@ -552,6 +500,27 @@ const removeSaksi = (index) => {
   else Swal.fire('Gagal', 'Minimal 1 Saksi.', 'warning')
 }
 
+const addCustomDocument = () => {
+  form.dokumenPendukung.push({ nama: '', file: null, required: false })
+}
+
+const removeCustomDocument = (index) => {
+  form.dokumenPendukung.splice(index, 1)
+}
+
+const handleCustomDocumentUpload = (event, index) => {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  if (file.size > 5 * 1024 * 1024) {
+    Swal.fire('File Terlalu Besar', 'Maksimal 5MB', 'warning')
+    event.target.value = ''
+    return
+  }
+  
+  form.dokumenPendukung[index].file = file
+}
+
 const handleSaksiKtpUpload = async (event, index) => {
   const file = event.target.files[0]
   if (!file) return
@@ -624,9 +593,7 @@ const validateStep3 = () => {
   return true
 }
 const validateStep4 = () => {
-  const { ktpPewaris, kk, suratKematian } = form.files
-  if (!ktpPewaris || !kk || !suratKematian) { Swal.fire('Dokumen Kurang', 'Wajib upload semua dokumen.', 'warning'); return false }
-  return true
+  return true // No required documents anymore
 }
 
 const nextStep = () => {
@@ -793,7 +760,6 @@ onMounted(() => {
               Memproses OCR... {{ scanProgress }}%
             </div>
           </div>
-          <p class="text-xs text-gray-600 mt-2">{{ form.files.ktpPewaris ? 'File: ' + form.files.ktpPewaris.name : 'Belum ada file yang dipilih' }}</p>
           <div class="mt-2 flex justify-start gap-4 text-xs">
             <button @click="loadSampleJson" type="button" class="text-blue-600 hover:text-blue-800 underline transition-colors">Isi dari JSON contoh</button>
             <button @click="resetFormSection" type="button" class="text-gray-500 hover:text-gray-700 underline transition-colors">Reset form</button>
@@ -1310,53 +1276,49 @@ onMounted(() => {
           <p class="text-sm text-gray-600">Upload dokumen-dokumen yang diperlukan untuk pengajuan waris</p>
         </div>
         
-        <div class="grid grid-cols-1 gap-6">
-          <div class="bg-white border border-gray-200 rounded-xl p-6">
-            <div class="flex items-center gap-3 mb-3">
-              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-800">Scan KTP Pewaris (Asli) *</label>
-                <p class="text-xs text-gray-600">Upload fotokopi KTP pewaris yang telah meninggal</p>
-              </div>
+        <!-- Dokumen -->
+        <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-800">Dokumen Pendukung</h3>
+              <p class="text-xs text-gray-600">Upload dokumen yang diperlukan untuk pengajuan waris</p>
             </div>
-            <input @change="e => handleFileUpload(e, 'ktpPewaris')" type="file" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer border border-dashed border-gray-300 rounded-lg p-4"/>
-            <p class="text-xs text-gray-500 mt-2">{{ form.files.ktpPewaris ? 'File: ' + form.files.ktpPewaris.name : 'Belum ada file yang dipilih' }}</p>
+            <button @click="addCustomDocument" type="button" class="flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Tambah Dokumen
+            </button>
           </div>
           
-          <div class="bg-white border border-gray-200 rounded-xl p-6">
-            <div class="flex items-center gap-3 mb-3">
-              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                </svg>
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-800">Kartu Keluarga (KK) *</label>
-                <p class="text-xs text-gray-600">Upload fotokopi Kartu Keluarga yang masih berlaku</p>
-              </div>
-            </div>
-            <input @change="e => handleFileUpload(e, 'kk')" type="file" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer border border-dashed border-gray-300 rounded-lg p-4"/>
-            <p class="text-xs text-gray-500 mt-2">{{ form.files.kk ? 'File: ' + form.files.kk.name : 'Belum ada file yang dipilih' }}</p>
+          <div v-if="form.dokumenPendukung.length === 0" class="text-center py-8 text-gray-500">
+            <svg class="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <p class="text-sm">Belum ada dokumen</p>
+            <p class="text-xs mt-1">Klik "Tambah Dokumen" untuk menambah dokumen pendukung</p>
           </div>
           
-          <div class="bg-white border border-gray-200 rounded-xl p-6">
-            <div class="flex items-center gap-3 mb-3">
-              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
+          <div v-else class="space-y-4">
+            <div v-for="(dokumen, index) in form.dokumenPendukung" :key="index" class="bg-white border border-gray-200 rounded-lg p-4">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                  <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <input v-model="dokumen.nama" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-sm" placeholder="Nama dokumen (contoh: Surat Nikah, Akta Tanah, dll)" />
+                </div>
+                <button @click="removeCustomDocument(index)" type="button" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                </button>
               </div>
-              <div>
-                <label class="block text-sm font-semibold text-gray-800">Surat Kematian *</label>
-                <p class="text-xs text-gray-600">Upload surat kematian dari instansi berwenang</p>
-              </div>
+              <input @change="e => handleCustomDocumentUpload(e, index)" type="file" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer border border-dashed border-gray-300 rounded-lg p-3"/>
+              <p class="text-xs text-gray-500 mt-2">{{ dokumen.file ? 'File: ' + dokumen.file.name : 'Belum ada file yang dipilih' }}</p>
             </div>
-            <input @change="e => handleFileUpload(e, 'suratKematian')" type="file" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer border border-dashed border-gray-300 rounded-lg p-4"/>
-            <p class="text-xs text-gray-500 mt-2">{{ form.files.suratKematian ? 'File: ' + form.files.suratKematian.name : 'Belum ada file yang dipilih' }}</p>
           </div>
         </div>
       </div>
