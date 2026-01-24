@@ -10,6 +10,9 @@ const searchQuery = ref('')
 // --- STATE ---
 const applications = ref([])
 const isLoading = ref(false)
+const showDetailModal = ref(false)
+const selectedForm = ref(null)
+const isLoadingDetail = ref(false)
 
 // --- LOGIKA FILTER SEARCH ---
 const filteredList = computed(() => {
@@ -62,14 +65,32 @@ const loadApplications = async () => {
 onMounted(() => {
   loadApplications()
 })
-const viewDetail = (id) => {
-  // Nanti diarahkan ke halaman detail
-  // router.push(`/dashboard/pengajuan/${id}`)
-  Swal.fire({
-    title: 'Detail Pengajuan',
-    text: `Menampilkan detail untuk ${id} (Fitur Detail sedang dikembangkan)`,
-    icon: 'info'
-  })
+const viewDetail = async (id) => {
+  try {
+    isLoadingDetail.value = true
+    showDetailModal.value = true
+    
+    // Fetch form details from API
+    const response = await api.get(`/form/${id}`)
+    selectedForm.value = response.data
+    
+  } catch (error) {
+    console.error('Failed to load form details:', error)
+    showDetailModal.value = false
+    Swal.fire({
+      icon: 'error',
+      title: 'Gagal Memuat Detail',
+      text: 'Terjadi kesalahan saat memuat detail form. Silakan coba lagi.',
+      confirmButtonColor: '#d33'
+    })
+  } finally {
+    isLoadingDetail.value = false
+  }
+}
+
+const closeDetailModal = () => {
+  showDetailModal.value = false
+  selectedForm.value = null
 }
 
 const downloadDoc = (docName) => {
@@ -196,6 +217,149 @@ const downloadDoc = (docName) => {
           </svg>
         </div>
         <p class="text-sm font-medium">Data tidak ditemukan.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div v-if="showDetailModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <div>
+          <h2 class="text-xl font-bold text-gray-800">Detail Pengajuan Waris</h2>
+          <p class="text-sm text-gray-600">ID: {{ selectedForm?.id || '---' }}</p>
+        </div>
+        <button @click="closeDetailModal" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Content -->
+      <div class="flex-1 overflow-y-auto p-6">
+        
+        <!-- Loading State -->
+        <div v-if="isLoadingDetail" class="flex items-center justify-center py-12">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+          <span class="ml-3 text-gray-600">Memuat detail...</span>
+        </div>
+
+        <!-- Form Details -->
+        <div v-else-if="selectedForm" class="space-y-8">
+          
+          <!-- Status Section -->
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-gray-700">Status Pengajuan</p>
+                <p class="text-lg font-bold text-gray-900">{{ selectedForm.status || 'Diajukan' }}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-sm text-gray-600">Tanggal Pengajuan</p>
+                <p class="font-medium">{{ selectedForm.created_at || selectedForm.date || '---' }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Data Pewaris -->
+          <div v-if="selectedForm.pewaris" class="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+              </svg>
+              Data Pewaris
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div><span class="font-medium text-gray-700">Nama:</span> {{ selectedForm.pewaris.nama || '---' }}</div>
+              <div><span class="font-medium text-gray-700">NIK:</span> {{ selectedForm.pewaris.nik || '---' }}</div>
+              <div><span class="font-medium text-gray-700">Tempat/Tgl Lahir:</span> {{ selectedForm.pewaris.tempatLahir || '---' }} / {{ selectedForm.pewaris.tanggalLahir || '---' }}</div>
+              <div><span class="font-medium text-gray-700">Jenis Kelamin:</span> {{ selectedForm.pewaris.jenisKelamin || '---' }}</div>
+              <div><span class="font-medium text-gray-700">Agama:</span> {{ selectedForm.pewaris.agama || '---' }}</div>
+              <div><span class="font-medium text-gray-700">Pekerjaan:</span> {{ selectedForm.pewaris.pekerjaan || '---' }}</div>
+              <div class="md:col-span-2"><span class="font-medium text-gray-700">Alamat:</span> {{ selectedForm.pewaris.alamat || '---' }}</div>
+            </div>
+          </div>
+
+          <!-- Data Ahli Waris -->
+          <div v-if="selectedForm.ahliWarisList && selectedForm.ahliWarisList.length" class="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              </svg>
+              Data Ahli Waris ({{ selectedForm.ahliWarisList.length }})
+            </h3>
+            <div class="space-y-4">
+              <div v-for="(ahli, index) in selectedForm.ahliWarisList" :key="index" class="bg-gray-50 rounded-lg p-4">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">{{ ahli.hubungan || 'Ahli Waris' }}</span>
+                  <span v-if="ahli.aktaFileName" class="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded">📄 Akta Kelahiran</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div><span class="font-medium text-gray-700">Nama:</span> {{ ahli.nama || '---' }}</div>
+                  <div><span class="font-medium text-gray-700">NIK:</span> {{ ahli.nik || '---' }}</div>
+                  <div><span class="font-medium text-gray-700">Tempat/Tgl Lahir:</span> {{ ahli.tempatLahir || '---' }} / {{ ahli.tanggalLahir || '---' }}</div>
+                  <div><span class="font-medium text-gray-700">Jenis Kelamin:</span> {{ ahli.jenisKelamin || '---' }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Data Saksi -->
+          <div v-if="selectedForm.saksiList && selectedForm.saksiList.length" class="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              Data Saksi ({{ selectedForm.saksiList.length }})
+            </h3>
+            <div class="space-y-4">
+              <div v-for="(saksi, index) in selectedForm.saksiList" :key="index" class="bg-gray-50 rounded-lg p-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div><span class="font-medium text-gray-700">Nama:</span> {{ saksi.nama || '---' }}</div>
+                  <div><span class="font-medium text-gray-700">NIK:</span> {{ saksi.nik || '---' }}</div>
+                  <div><span class="font-medium text-gray-700">Tempat/Tgl Lahir:</span> {{ saksi.tempatLahir || '---' }} / {{ saksi.tanggalLahir || '---' }}</div>
+                  <div><span class="font-medium text-gray-700">Pekerjaan:</span> {{ saksi.pekerjaan || '---' }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dokumen Pendukung -->
+          <div v-if="selectedForm.dokumenPendukung && selectedForm.dokumenPendukung.length" class="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              Dokumen Pendukung ({{ selectedForm.dokumenPendukung.length }})
+            </h3>
+            <div class="space-y-2">
+              <div v-for="(dok, index) in selectedForm.dokumenPendukung" :key="index" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-3">
+                  <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                  <span class="text-sm font-medium text-gray-700">{{ dok.nama || '---' }}</span>
+                </div>
+                <span v-if="dok.uploaded" class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">✅ Terupload</span>
+                <span v-else class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded">❌ Belum upload</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-6 border-t border-gray-200 bg-gray-50">
+        <div class="flex justify-end">
+          <button @click="closeDetailModal" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+            Tutup
+          </button>
+        </div>
       </div>
 
     </div>
