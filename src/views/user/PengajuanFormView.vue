@@ -53,7 +53,7 @@ const assignBasePersonFields = (target) => {
 }
 
 const spouseTemplate = () => ({ ...basePersonFields(), hubungan: 'Pasangan', ktpFile: null })
-const newEmptyAhli = () => ({ ...basePersonFields(), hubungan: 'Anak Kandung', ktpFile: null })
+const newEmptyAhli = () => ({ ...basePersonFields(), hubungan: 'Anak Kandung', ktpFile: null, aktaKelahiranFile: null, aktaUploaded: false, aktaUploading: false, aktaUploadProgress: 0 })
 const newEmptySaksi = () => ({ ...basePersonFields(), hubungan: 'Saksi', ktpFile: null })
 
 const form = reactive({
@@ -501,14 +501,81 @@ const removeSaksi = (index) => {
 }
 
 const addCustomDocument = () => {
-  form.dokumenPendukung.push({ nama: '', file: null, required: false })
+  form.dokumenPendukung.push({ 
+    nama: '', 
+    file: null, 
+    fileName: null,
+    uploaded: false,
+    uploading: false,
+    uploadProgress: 0,
+    required: false 
+  })
 }
 
-const removeCustomDocument = (index) => {
-  form.dokumenPendukung.splice(index, 1)
+const handleChildAktaUpload = async (event, index) => {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  const child = form.ahliWarisList[index + 1] // +1 karena index 0 adalah spouse
+  if (!child) return
+
+  if (file.size > 5 * 1024 * 1024) {
+    Swal.fire('File Terlalu Besar', 'Maksimal 5MB', 'warning')
+    event.target.value = ''
+    return
+  }
+
+  child.aktaUploading = true
+  child.aktaUploadProgress = 0
+
+  try {
+    Swal.fire({
+      title: 'Mengunggah akta kelahiran...',
+      text: 'Mohon tunggu, file sedang diupload',
+      didOpen: () => Swal.showLoading(),
+      allowEscapeKey: false,
+      allowOutsideClick: false
+    })
+
+    const fd = new FormData()
+    fd.append('file', file)
+
+    const res = await api.post('/upload/akta', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (progressEvent) => {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        child.aktaUploadProgress = percentCompleted
+      }
+    })
+
+    child.aktaKelahiranFile = file
+    child.aktaFileName = res.data.file_name
+    child.aktaUploaded = true
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Upload Berhasil',
+      text: 'Akta kelahiran berhasil diunggah',
+      timer: 2000,
+      showConfirmButton: false
+    })
+  } catch (error) {
+    console.error('Akta upload failed', error)
+    Swal.fire({
+      icon: 'error', 
+      title: 'Gagal Upload',
+      text: 'Terjadi kesalahan saat mengunggah akta kelahiran'
+    })
+    child.aktaKelahiranFile = file
+    child.aktaUploaded = false
+  } finally {
+    child.aktaUploading = false
+    event.target.value = ''
+    try { Swal.close() } catch (e) {}
+  }
 }
 
-const handleCustomDocumentUpload = (event, index) => {
+const handleCustomDocumentUpload = async (event, index) => {
   const file = event.target.files[0]
   if (!file) return
   
@@ -518,7 +585,62 @@ const handleCustomDocumentUpload = (event, index) => {
     return
   }
   
-  form.dokumenPendukung[index].file = file
+  const dokumen = form.dokumenPendukung[index]
+  if (!dokumen) return
+
+  // Show uploading progress
+  dokumen.uploading = true
+  dokumen.uploadProgress = 0
+  
+  try {
+    Swal.fire({
+      title: 'Mengunggah dokumen...',
+      text: 'Mohon tunggu, file sedang diupload',
+      didOpen: () => Swal.showLoading(),
+      allowEscapeKey: false,
+      allowOutsideClick: false
+    })
+    
+    const fd = new FormData()
+    fd.append('file', file)
+    
+    // Upload to backend using documents endpoint
+    const res = await api.post('/upload/documents', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (progressEvent) => {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        dokumen.uploadProgress = percentCompleted
+      }
+    })
+    
+    // Store file info and backend filename
+    dokumen.file = file
+    dokumen.fileName = res.data.file_name // Backend returns this
+    dokumen.uploaded = true
+    
+    Swal.fire({
+      icon: 'success',
+      title: 'Upload Berhasil',
+      text: 'Dokumen berhasil diunggah',
+      timer: 2000,
+      showConfirmButton: false
+    })
+    
+  } catch (error) {
+    console.error('Document upload failed', error)
+    Swal.fire({
+      icon: 'error',
+      title: 'Gagal Upload',
+      text: 'Terjadi kesalahan saat mengunggah dokumen'
+    })
+    
+    // Still store file locally for user reference
+    dokumen.file = file
+    dokumen.uploaded = false
+  } finally {
+    dokumen.uploading = false
+    event.target.value = ''
+  }
 }
 
 const handleSaksiKtpUpload = async (event, index) => {
@@ -1034,6 +1156,40 @@ onMounted(() => {
               <p class="text-xs text-gray-600 mt-2">{{ ahli.ktpFile ? 'File: ' + ahli.ktpFile.name : 'Belum ada file yang dipilih' }}</p>
             </div>
             
+            <!-- Upload Akta Kelahiran (Wajib) -->
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Akta Kelahiran Anak ke-{{ index + 1 }} *</label>
+              <p class="text-xs text-red-600 mb-2">⚠️ Wajib: Upload akta kelahiran untuk setiap anak</p>
+              <input @change="e => handleChildAktaUpload(e, index)" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-100 file:text-red-700 hover:file:bg-red-200 cursor-pointer border border-dashed border-red-300 rounded-lg p-3" type="file" :disabled="ahli.aktaUploading" />
+              
+              <!-- Upload Status for Akta -->
+              <div class="mt-2">
+                <div v-if="ahli.aktaUploading" class="flex items-center gap-2 text-xs text-blue-600">
+                  <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                  <span>Mengunggah... {{ ahli.aktaUploadProgress }}%</span>
+                  <div class="flex-1 bg-gray-200 rounded-full h-1 ml-2">
+                    <div class="bg-blue-600 h-1 rounded-full transition-all duration-300" :style="`width: ${ahli.aktaUploadProgress}%`"></div>
+                  </div>
+                </div>
+                
+                <div v-else-if="ahli.aktaUploaded" class="flex items-center gap-2 text-xs text-green-600">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                  <span>✅ Akta kelahiran terupload: {{ ahli.aktaKelahiranFile?.name }}</span>
+                </div>
+                
+                <div v-else-if="ahli.aktaKelahiranFile && !ahli.aktaUploaded" class="flex items-center gap-2 text-xs text-red-600">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span>❌ Upload gagal: {{ ahli.aktaKelahiranFile?.name }}</span>
+                </div>
+                
+                <p v-else class="text-xs text-gray-500">Belum ada akta kelahiran yang dipilih</p>
+              </div>
+            </div>
+            
             <!-- Data Utama Anak -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               <div>
@@ -1316,8 +1472,34 @@ onMounted(() => {
                   </svg>
                 </button>
               </div>
-              <input @change="e => handleCustomDocumentUpload(e, index)" type="file" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer border border-dashed border-gray-300 rounded-lg p-3"/>
-              <p class="text-xs text-gray-500 mt-2">{{ dokumen.file ? 'File: ' + dokumen.file.name : 'Belum ada file yang dipilih' }}</p>
+              <input @change="e => handleCustomDocumentUpload(e, index)" type="file" accept="image/*,.pdf" :disabled="dokumen.uploading" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer border border-dashed border-gray-300 rounded-lg p-3"/>
+              
+              <!-- Upload Status -->
+              <div class="mt-2 space-y-1">
+                <div v-if="dokumen.uploading" class="flex items-center gap-2 text-xs text-blue-600">
+                  <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                  <span>Mengunggah... {{ dokumen.uploadProgress }}%</span>
+                  <div class="flex-1 bg-gray-200 rounded-full h-1">
+                    <div class="bg-blue-600 h-1 rounded-full transition-all duration-300" :style="`width: ${dokumen.uploadProgress}%`"></div>
+                  </div>
+                </div>
+                
+                <div v-else-if="dokumen.uploaded" class="flex items-center gap-2 text-xs text-green-600">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                  <span>Upload berhasil: {{ dokumen.file?.name }}</span>
+                </div>
+                
+                <div v-else-if="dokumen.file && !dokumen.uploaded" class="flex items-center gap-2 text-xs text-red-600">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span>Upload gagal: {{ dokumen.file?.name }}</span>
+                </div>
+                
+                <p v-else class="text-xs text-gray-500">Belum ada file yang dipilih</p>
+              </div>
             </div>
           </div>
         </div>
