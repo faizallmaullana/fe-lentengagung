@@ -96,6 +96,7 @@ const handleRegister = async () => {
         router.push('/approval')
       }
     } else {
+      console.log(result)
       Swal.fire({
         icon: 'error',
         title: 'Gagal Mendaftar',

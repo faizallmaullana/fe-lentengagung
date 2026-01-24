@@ -1,0 +1,31 @@
+[
+    { "id": "AUTH-01", "modul": "1. Registrasi & Autentikasi", "fitur": "Register", "skenario": "Pendaftaran Akun Baru (Happy Path)", "input": "NIK 16 digit, Email Baru", "langkah": "Isi form lengkap -> Klik Daftar", "ekspektasi": "Akun dibuat, redirect ke Dashboard", "status": "Pending", "catatan": "" },
+    { "id": "AUTH-02", "modul": "1. Registrasi & Autentikasi", "fitur": "Register", "skenario": "Validasi Format NIK (Kurang Digit)", "input": "NIK 6 digit", "langkah": "Isi NIK pendek -> Daftar", "ekspektasi": "Alert: NIK harus 16 digit", "status": "Pending", "catatan": "" },
+    { "id": "AUTH-03", "modul": "1. Registrasi & Autentikasi", "fitur": "Register", "skenario": "Validasi Format NIK (Bukan Angka)", "input": "Huruf di NIK", "langkah": "Isi huruf -> Daftar", "ekspektasi": "Input ditolak / Error format", "status": "Pending", "catatan": "" },
+    { "id": "AUTH-04", "modul": "1. Registrasi & Autentikasi", "fitur": "Register", "skenario": "Validasi Email Duplikat", "input": "Email lama", "langkah": "Isi email -> Daftar", "ekspektasi": "Alert: Email sudah terdaftar", "status": "Pending", "catatan": "" },
+    { "id": "AUTH-05", "modul": "1. Registrasi & Autentikasi", "fitur": "Login", "skenario": "Login Sukses", "input": "Kredensial Valid", "langkah": "Input email/pass -> Masuk", "ekspektasi": "Masuk Dashboard", "status": "Pending", "catatan": "" },
+    { "id": "AUTH-06", "modul": "1. Registrasi & Autentikasi", "fitur": "Login", "skenario": "Login Gagal (Password)", "input": "Password Salah", "langkah": "Input pass salah -> Masuk", "ekspektasi": "Alert: Kredensial tidak valid", "status": "Pending", "catatan": "" },
+    
+    { "id": "PEW-01", "modul": "2. Data Pewaris (Step 1)", "fitur": "OCR Scan", "skenario": "Scan KTP Jelas", "input": "KTP_Jelas.jpg", "langkah": "Upload KTP", "ekspektasi": "Field NIK, Nama, Alamat terisi otomatis", "status": "Pending", "catatan": "" },
+    { "id": "PEW-02", "modul": "2. Data Pewaris (Step 1)", "fitur": "OCR Scan", "skenario": "Scan KTP Buram", "input": "KTP_Blur.jpg", "langkah": "Upload KTP", "ekspektasi": "Info: Gagal baca, isi manual", "status": "Pending", "catatan": "" },
+    { "id": "PEW-04", "modul": "2. Data Pewaris (Step 1)", "fitur": "Input Manual", "skenario": "Validasi NIK Manual", "input": "NIK Valid", "langkah": "Ketik NIK", "ekspektasi": "Tidak error", "status": "Pending", "catatan": "" },
+    { "id": "PEW-05", "modul": "2. Data Pewaris (Step 1)", "fitur": "Validasi", "skenario": "Tanggal Meninggal Kosong", "input": "Tgl Kosong", "langkah": "Klik Lanjut", "ekspektasi": "Alert: Wajib diisi", "status": "Pending", "catatan": "" },
+    { "id": "PEW-06", "modul": "2. Data Pewaris (Step 1)", "fitur": "Reset", "skenario": "Kosongkan Form", "input": "-", "langkah": "Klik Reset", "ekspektasi": "Form bersih", "status": "Pending", "catatan": "" },
+
+    { "id": "AHLI-01", "modul": "3. Ahli Waris (Step 2)", "fitur": "List", "skenario": "Tambah Row", "input": "-", "langkah": "Klik + Tambah", "ekspektasi": "Row baru muncul", "status": "Pending", "catatan": "" },
+    { "id": "AHLI-02", "modul": "3. Ahli Waris (Step 2)", "fitur": "List", "skenario": "Hapus Row", "input": "2 Row", "langkah": "Klik Hapus row 2", "ekspektasi": "Row terhapus", "status": "Pending", "catatan": "" },
+    { "id": "AHLI-03", "modul": "3. Ahli Waris (Step 2)", "fitur": "Validasi", "skenario": "Hapus Row Terakhir", "input": "1 Row", "langkah": "Klik Hapus", "ekspektasi": "Ditolak (Min 1)", "status": "Pending", "catatan": "" },
+    { "id": "AHLI-04", "modul": "3. Ahli Waris (Step 2)", "fitur": "Validasi", "skenario": "Data Tidak Lengkap", "input": "Hubungan kosong", "langkah": "Klik Lanjut", "ekspektasi": "Alert: Lengkapi data", "status": "Pending", "catatan": "" },
+
+    { "id": "ASSET-01", "modul": "4. Harta Warisan (Step 3)", "fitur": "Aset", "skenario": "Tambah Jenis Aset", "input": "Tanah & Motor", "langkah": "Pilih dropdown", "ekspektasi": "Dropdown tersimpan", "status": "Pending", "catatan": "" },
+    { "id": "ASSET-02", "modul": "4. Harta Warisan (Step 3)", "fitur": "Validasi", "skenario": "Deskripsi Kosong", "input": "Deskripsi kosong", "langkah": "Klik Lanjut", "ekspektasi": "Alert: Wajib diisi", "status": "Pending", "catatan": "" },
+
+    { "id": "DOC-01", "modul": "5. Dokumen & Submit (Step 4)", "fitur": "Upload", "skenario": "Upload Valid", "input": "PDF < 2MB", "langkah": "Pilih File", "ekspektasi": "File terbaca, sukses", "status": "Pending", "catatan": "" },
+    { "id": "DOC-02", "modul": "5. Dokumen & Submit (Step 4)", "fitur": "Upload", "skenario": "File Oversize", "input": "File > 5MB", "langkah": "Pilih File", "ekspektasi": "Alert: File terlalu besar", "status": "Pending", "catatan": "" },
+    { "id": "DOC-04", "modul": "5. Dokumen & Submit (Step 4)", "fitur": "Submit", "skenario": "Dokumen Kurang", "input": "KK Kosong", "langkah": "Klik Kirim", "ekspektasi": "Alert: Dokumen kurang", "status": "Pending", "catatan": "" },
+    { "id": "DOC-05", "modul": "5. Dokumen & Submit (Step 4)", "fitur": "Submit", "skenario": "Submit Sukses", "input": "Lengkap", "langkah": "Klik Kirim -> Ya", "ekspektasi": "Sukses, Redirect Dashboard", "status": "Pending", "catatan": "" },
+
+    { "id": "DASH-01", "modul": "6. Dashboard & Output", "fitur": "History", "skenario": "Cek Status Baru", "input": "-", "langkah": "Buka History", "ekspektasi": "Status Menunggu Verifikasi", "status": "Pending", "catatan": "" },
+    { "id": "DASH-03", "modul": "6. Dashboard & Output", "fitur": "Generate", "skenario": "Download PDF", "input": "Status Selesai", "langkah": "Klik Download", "ekspektasi": "File PDF terunduh", "status": "Pending", "catatan": "" },
+    { "id": "DASH-04", "modul": "6. Dashboard & Output", "fitur": "Draft", "skenario": "Lanjut Draft", "input": "Login Ulang", "langkah": "Buka Form", "ekspektasi": "Data lama muncul", "status": "Pending", "catatan": "" }
+]

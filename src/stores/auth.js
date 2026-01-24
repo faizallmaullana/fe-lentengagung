@@ -95,6 +95,7 @@ export const useAuthStore = defineStore('auth', () => {
   const register = async (formData) => {
     try {
       const response = await authServices.register(formData)
+      console.log(response)
       // Normalize possible response shapes so callers can rely on { success, ... }
       if (response && (response.success === true || response.approvalToken || response.token)) {
         return { success: true, ...response }
@@ -103,6 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
       // Fallback: return success with data container
       return { success: true, data: response }
     } catch (error) {
+      console.log(error)
       return { success: false, message: error.message || 'Gagal mendaftar.' }
     }
   }

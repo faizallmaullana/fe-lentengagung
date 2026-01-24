@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Plan Dashboard - Sistem Pengajuan Ahli Waris</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .status-pass { background-color: #dcfce7; color: #166534; }
+        .status-fail { background-color: #fee2e2; color: #991b1b; }
+        .status-pending { background-color: #f3f4f6; color: #374151; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-8" x-data="testDashboard()">
+
+    <!-- Header -->
+    <header class="max-w-7xl mx-auto mb-8">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Test Plan Dashboard</h1>
+                <p class="text-gray-500 mt-1">Proyek: Sistem Pengajuan Ahli Waris - Kelurahan Lenteng Agung</p>
+            </div>
+            <div class="mt-4 md:mt-0 flex gap-3">
+                <button @click="resetData()" class="px-4 py-2 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200">Reset</button>
+                <button @click="document.getElementById('importFile').click()" class="px-4 py-2 text-sm text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200">Import JSON</button>
+                <button @click="exportData()" class="px-4 py-2 text-sm text-green-600 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200">Export JSON</button>
+                <button @click="window.print()" class="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow">Print PDF</button>
+                <input type="file" id="importFile" class="hidden" style="display:none" @change="importData($event)" accept=".json">
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <div class="text-gray-500 text-sm font-medium">Total Skenario</div>
+                <div class="text-2xl font-bold text-gray-900" x-text="cases.length">0</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-green-100 bg-green-50/30">
+                <div class="text-green-600 text-sm font-medium">Passed</div>
+                <div class="text-2xl font-bold text-green-700" x-text="stats.passed">0</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-red-100 bg-red-50/30">
+                <div class="text-red-600 text-sm font-medium">Failed</div>
+                <div class="text-2xl font-bold text-red-700" x-text="stats.failed">0</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <div class="text-gray-500 text-sm font-medium">Progress</div>
+                <div class="flex items-center gap-2">
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" :style="`width: ${stats.progress}%`"></div>
+                    </div>
+                    <span class="text-sm font-bold text-gray-700" x-text="`${Math.round(stats.progress)}%`"></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto space-y-8">
+        
+        <template x-if="isLoading">
+            <div class="text-center py-12">
+                <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <p class="text-gray-500">Memuat data checklist...</p>
+                <p class="text-xs text-gray-400 mt-2">Pastikan file checklist-data.json ada di folder yang sama.</p>
+            </div>
+        </template>
+        
+        <template x-for="(moduleCases, moduleName) in groupedCases" :key="moduleName">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center cursor-pointer" @click="toggleModule(moduleName)">
+                    <h2 class="text-lg font-bold text-gray-800" x-text="moduleName"></h2>
+                    <span class="text-sm text-gray-500" x-text="`${moduleCases.filter(c => c.status === 'Pass').length} / ${moduleCases.length} Selesai`"></span>
+                </div>
+                
+                <div class="overflow-x-auto" x-show="openModules.includes(moduleName)" x-transition>
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-50 text-gray-500 uppercase font-medium text-xs">
+                            <tr>
+                                <th class="px-6 py-3 w-24">ID</th>
+                                <th class="px-6 py-3 w-48">Fitur</th>
+                                <th class="px-6 py-3 w-64">Skenario</th>
+                                <th class="px-6 py-3">Langkah & Ekspektasi</th>
+                                <th class="px-6 py-3 w-32">Status</th>
+                                <th class="px-6 py-3 w-64">Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <template x-for="tc in moduleCases" :key="tc.id">
+                                <tr class="hover:bg-gray-50/50 transition-colors">
+                                    <td class="px-6 py-4 font-mono text-gray-500 font-medium" x-text="tc.id"></td>
+                                    <td class="px-6 py-4 font-medium text-gray-900" x-text="tc.fitur"></td>
+                                    <td class="px-6 py-4 text-gray-600">
+                                        <div x-text="tc.skenario" class="font-medium text-gray-800 mb-1"></div>
+                                        <div class="text-xs text-gray-400" x-text="`Input: ${tc.input}`"></div>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-600 space-y-1">
+                                        <div><span class="font-semibold text-xs uppercase text-gray-400">Step:</span> <span x-text="tc.langkah"></span></div>
+                                        <div><span class="font-semibold text-xs uppercase text-green-600">Expect:</span> <span x-text="tc.ekspektasi"></span></div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <select x-model="tc.status" @change="updateStatus(tc.id, $event.target.value)" 
+                                            class="px-2 py-1 rounded-md text-xs font-bold border-0 ring-1 ring-inset cursor-pointer w-full"
+                                            :class="{
+                                                'bg-green-50 ring-green-600/20 text-green-700': tc.status === 'Pass',
+                                                'bg-red-50 ring-red-600/20 text-red-700': tc.status === 'Fail',
+                                                'bg-gray-50 ring-gray-500/10 text-gray-600': tc.status === 'Pending'
+                                            }">
+                                            <option value="Pending">Pending</option>
+                                            <option value="Pass">PASS</option>
+                                            <option value="Fail">FAIL</option>
+                                        </select>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <textarea x-model="tc.catatan" @input.debounce="updateNote(tc.id, $event.target.value)" placeholder="Tulis catatan..." class="w-full text-xs border-gray-200 rounded focus:ring-blue-500 focus:border-blue-500 bg-gray-50 min-h-[60px]"></textarea>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </template>
+    </main>
+
+    <footer class="max-w-7xl mx-auto mt-12 mb-8 text-center text-gray-400 text-sm">
+        <p>Generated by GitHub Copilot for Sistem Pengajuan Waris</p>
+    </footer>
+
+<script>
+    function testDashboard() {
+        return {
+            cases: [],
+            openModules: [],
+            isLoading: true,
+            
+            async init() {
+                // Try to load from LocalStorage first (cache) or fetch from JSON
+                const saved = localStorage.getItem('testPlanData');
+                if (saved) {
+                    this.cases = JSON.parse(saved);
+                    this.isLoading = false;
+                    this.openModules = [...new Set(this.cases.map(c => c.modul))];
+                    // Still fetch to check for structure updates? simplified for now.
+                } else {
+                    await this.loadFromJSON();
+                }
+            },
+
+            async loadFromJSON() {
+                try {
+                    const response = await fetch('checklist-data.json');
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    this.cases = await response.json();
+                    this.save(); // Save to local storage
+                    this.openModules = [...new Set(this.cases.map(c => c.modul))];
+                } catch (error) {
+                    console.error('Error loading JSON:', error);
+                    // Don't alert here to avoid annoyance on file:// opening without server
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            exportData() {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.cases, null, 2));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", "checklist-data.json");
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+            },
+
+            importData(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        this.cases = JSON.parse(e.target.result);
+                        this.save();
+                        this.openModules = [...new Set(this.cases.map(c => c.modul))];
+                        alert('Data berhasil diimport & disimpan!');
+                    } catch (error) {
+                        alert('Format JSON tidak valid!');
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = ''; // Reset input
+            },
+
+            get groupedCases() {
+                return this.cases.reduce((acc, curr) => {
+                    if (!acc[curr.modul]) acc[curr.modul] = [];
+                    acc[curr.modul].push(curr);
+                    return acc;
+                }, {});
+            },
+
+            get stats() {
+                const total = this.cases.length;
+                const passed = this.cases.filter(c => c.status === 'Pass').length;
+                const failed = this.cases.filter(c => c.status === 'Fail').length;
+                const progress = total === 0 ? 0 : ((passed + failed) / total) * 100;
+                return { total, passed, failed, progress };
+            },
+
+            toggleModule(name) {
+                if (this.openModules.includes(name)) {
+                    this.openModules = this.openModules.filter(m => m !== name);
+                } else {
+                    this.openModules.push(name);
+                }
+            },
+
+            updateStatus(id, newStatus) {
+                const index = this.cases.findIndex(c => c.id === id);
+                if (index !== -1) {
+                    this.cases[index].status = newStatus;
+                    this.save();
+                }
+            },
+
+            updateNote(id, note) {
+                const index = this.cases.findIndex(c => c.id === id);
+                if (index !== -1) {
+                    this.cases[index].catatan = note;
+                    this.save();
+                }
+            },
+
+            save() {
+                localStorage.setItem('testPlanData', JSON.stringify(this.cases));
+            },
+
+            resetData() {
+                if(confirm('Reset semua status? Data akan dikembalikan ke kondisi awal (dari JSON).')) {
+                    localStorage.removeItem('testPlanData');
+                    window.location.reload();
+                }
+            }
+        }
+    }
+</script>
+</body>
+</html>
