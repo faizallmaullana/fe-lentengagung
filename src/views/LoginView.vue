@@ -55,7 +55,7 @@ const handleLogin = async () => {
 
       // Redirect
       if (activeTab.value === 'warga') {
-        router.push('/dashboard') 
+        router.push('/dashboard/pengajuan') 
       } else {
         router.push('/admin/antrian')
       }

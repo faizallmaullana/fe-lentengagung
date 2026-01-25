@@ -70,9 +70,16 @@ const viewDetail = async (id) => {
     isLoadingDetail.value = true
     showDetailModal.value = true
     
+    console.log('Loading detail for ID:', id)
+    
     // Fetch form details from API
     const response = await api.get(`/form/${id}`)
-    selectedForm.value = response.data
+    selectedForm.value = {
+      ...response.data,
+      originalId: id // Preserve the original ID used to fetch
+    }
+    
+    console.log('Form detail loaded:', selectedForm.value)
     
   } catch (error) {
     console.error('Failed to load form details:', error)
@@ -91,6 +98,88 @@ const viewDetail = async (id) => {
 const closeDetailModal = () => {
   showDetailModal.value = false
   selectedForm.value = null
+}
+
+const editForm = async () => {
+  console.log('Edit form clicked, selectedForm:', selectedForm.value)
+  
+  // Check multiple possible ID sources
+  let formId = selectedForm.value?.id_form || 
+              selectedForm.value?.id || 
+              selectedForm.value?.originalId
+  
+  console.log('Extracted form ID:', formId)
+  
+  if (!formId) {
+    console.warn('No form ID found in any expected field')
+    console.log('Available fields:', Object.keys(selectedForm.value || {}))
+    
+    Swal.fire({
+      icon: 'warning',
+      title: 'ID Form Tidak Ditemukan',
+      html: `
+        <p>ID form tidak ditemukan dalam data.</p>
+        <small class="text-gray-500">Silakan tutup modal dan coba klik detail lagi, kemudian klik Edit.</small>
+      `,
+      confirmButtonText: 'OK',
+      footer: '<small>Debug: Periksa console untuk detail lebih lanjut</small>'
+    })
+    return
+  }
+  
+  try {
+    // Show loading feedback
+    Swal.fire({
+      title: 'Memuat Data Form...',
+      text: `Mengambil data terbaru untuk Form ID: ${formId}`,
+      didOpen: () => Swal.showLoading(),
+      allowEscapeKey: false,
+      allowOutsideClick: false
+    })
+    
+    // Fetch fresh data from backend
+    console.log(`Fetching form data for ID: ${formId}`)
+    const response = await api.get(`/form/${formId}`)
+    const freshFormData = response.data
+    
+    console.log('Fresh form data received:', freshFormData)
+    
+    // Prepare form data for editing with fresh backend data
+    const formDataForEdit = {
+      isEditing: true,
+      formId: freshFormData.id_form || freshFormData.id || formId,
+      id_form: freshFormData.id_form || freshFormData.id || formId,
+      pewaris: freshFormData.pewaris || {},
+      ahliWarisList: Array.isArray(freshFormData.ahliWarisList) ? freshFormData.ahliWarisList : [],
+      saksiList: Array.isArray(freshFormData.saksiList) ? freshFormData.saksiList : [],
+      dokumenPendukung: Array.isArray(freshFormData.dokumenPendukung) ? freshFormData.dokumenPendukung : []
+    }
+    
+    // Save to localStorage
+    localStorage.setItem('pengajuan-form-edit-data', JSON.stringify(formDataForEdit))
+    console.log('Edit data saved to localStorage')
+    
+    // Update loading message
+    Swal.update({
+      title: 'Membuka Form Edit...',
+      text: 'Data berhasil dimuat, mengarahkan ke form'
+    })
+    
+    // Redirect to form page
+    setTimeout(() => {
+      Swal.close()
+      router.push('/dashboard/pengajuan')
+    }, 800)
+    
+  } catch (error) {
+    console.error('Error loading form data for edit:', error)
+    Swal.fire({
+      icon: 'error',
+      title: 'Gagal Memuat Data',
+      text: error.response?.data?.error || `Terjadi kesalahan saat memuat data form ID: ${formId}. Silakan coba lagi.`,
+      confirmButtonText: 'OK'
+    })
+  }
 }
 
 const viewDocument = (fileType, fileName) => {
@@ -245,11 +334,28 @@ const downloadDoc = (docName) => {
           <h2 class="text-xl font-bold text-gray-800">Detail Pengajuan Waris</h2>
           <p class="text-sm text-gray-600">ID: {{ selectedForm?.id || '---' }}</p>
         </div>
-        <button @click="closeDetailModal" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
+        
+        <div class="flex items-center gap-3">
+          <!-- Edit Button -->
+          <button 
+            @click="editForm"
+            :disabled="isLoadingDetail"
+            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            :title="!selectedForm?.id ? 'ID form tidak tersedia' : 'Edit form ini'"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+            </svg>
+            {{ isLoadingDetail ? 'Loading...' : 'Edit Form' }}
+          </button>
+          
+          <!-- Close Button -->
+          <button @click="closeDetailModal" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <!-- Modal Content -->

@@ -70,10 +70,86 @@ const handleAjukan = () => {
         </div>
     </section>
 
-    <section class="pb-16 pt-8 bg-white">
-        <div class="container mx-auto px-6 max-w-5xl">
-            <h2 class="text-2xl font-bold mb-6 text-slate-900">Tata Cara Permohonan</h2>
-            <div class="w-full h-96 bg-gray-200 rounded-sm"></div>
+    <section class="pb-16 pt-8 bg-slate-50">
+        <div class="container mx-auto px-6 max-w-6xl">
+            <h2 class="text-3xl font-bold mb-10 text-slate-900 text-center">Tata Cara Permohonan</h2>
+            
+            <!-- Steps Container -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                <!-- Step 1 -->
+                <div class="bg-white rounded-lg p-6 shadow-md border border-slate-200 text-center">
+                    <div class="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-lg font-bold">1</div>
+                    <h3 class="font-bold text-slate-900 mb-2">Persiapan Dokumen</h3>
+                    <p class="text-sm text-slate-600 leading-relaxed">Siapkan dokumen yang diperlukan seperti KTP, Kartu Keluarga, dan dokumen pendukung lainnya</p>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="bg-white rounded-lg p-6 shadow-md border border-slate-200 text-center">
+                    <div class="w-12 h-12 bg-green-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-lg font-bold">2</div>
+                    <h3 class="font-bold text-slate-900 mb-2">Ajukan Online</h3>
+                    <p class="text-sm text-slate-600 leading-relaxed">Klik tombol "Ajukan Permohonan" dan isi formulir permohonan secara lengkap</p>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="bg-white rounded-lg p-6 shadow-md border border-slate-200 text-center">
+                    <div class="w-12 h-12 bg-orange-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-lg font-bold">3</div>
+                    <h3 class="font-bold text-slate-900 mb-2">Verifikasi</h3>
+                    <p class="text-sm text-slate-600 leading-relaxed">Petugas akan memverifikasi dan memvalidasi dokumen yang telah diajukan</p>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="bg-white rounded-lg p-6 shadow-md border border-slate-200 text-center">
+                    <div class="w-12 h-12 bg-purple-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-lg font-bold">4</div>
+                    <h3 class="font-bold text-slate-900 mb-2">Pengambilan</h3>
+                    <p class="text-sm text-slate-600 leading-relaxed">Surat Pernyataan Ahli Waris siap diambil sesuai jadwal yang telah ditentukan</p>
+                </div>
+            </div>
+
+            <!-- Requirements Section -->
+            <div class="bg-white rounded-lg shadow-md border border-slate-200 p-8">
+                <h3 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-blue-600">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-4.548 0c-1.131.094-1.976 1.057-1.976 2.192V18a2.25 2.25 0 002.25 2.25zm-9 0v-9a2.25 2.25 0 012.25-2.25v0a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25v0a2.25 2.25 0 01-2.25-2.25z" />
+                    </svg>
+                    Dokumen Yang Diperlukan
+                </h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-semibold text-slate-800 mb-3">Dokumen Pemohon:</h4>
+                        <ul class="space-y-2 text-slate-600">
+                            <li class="flex items-start gap-2">
+                                <span class="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></span>
+                                KTP asli dan fotokopi pemohon
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></span>
+                                Kartu Keluarga asli dan fotokopi
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></span>
+                                KTP asli dan fotokopi ahli waris lainnya
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-slate-800 mb-3">Dokumen Pewaris:</h4>
+                        <ul class="space-y-2 text-slate-600">
+                            <li class="flex items-start gap-2">
+                                <span class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+                                Akta Kematian asli dan fotokopi
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+                                KTP terakhir pewaris (fotokopi)
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
+                                Surat nikah/cerai (jika ada)
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 

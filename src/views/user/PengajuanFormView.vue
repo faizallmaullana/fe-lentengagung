@@ -18,6 +18,8 @@ const progressWidth = computed(() => ((currentStep.value - 1) / (steps.length - 
 
 const isApproved = ref(false) // Track apakah user sudah klik approval
 const formId = ref(null) // ID dari form yang dibuat via API
+const isEditing = ref(false) // Track if we're editing existing form
+const editingFormId = ref(null) // ID of form being edited
 const isChecking = ref(true) // Track apakah sedang check existing forms
 const isScanning = ref(false)
 const scanProgress = ref(0)
@@ -97,8 +99,166 @@ const clearFormDraft = () => {
   localStorage.removeItem(STORAGE_KEY)
 }
 
+const loadEditData = (editData) => {
+  try {
+    console.log('Loading edit data:', editData)
+    isEditing.value = true
+    
+    // Handle both 'formId' and 'id_form' from backend
+    editingFormId.value = editData.formId || editData.id_form
+    
+    // Load pewaris data
+    if (editData.pewaris && typeof editData.pewaris === 'object') {
+      // Clear existing data first
+      Object.keys(form.pewaris).forEach(key => {
+        if (key !== 'ktpFile') form.pewaris[key] = ''
+      })
+      
+      // Load backend data with proper field mapping
+      Object.assign(form.pewaris, {
+        ...editData.pewaris,
+        ktpFile: null // Reset file input
+      })
+      
+      // Handle KTP filename separately
+      if (editData.pewaris.ktpFileName) {
+        form.ktpFileName = editData.pewaris.ktpFileName
+      }
+    }
+    
+    // Load ahli waris data
+    if (Array.isArray(editData.ahliWarisList) && editData.ahliWarisList.length > 0) {
+      const normalized = editData.ahliWarisList.map((entry, index) => {
+        const template = index === 0 ? spouseTemplate() : newEmptyAhli()
+        
+        // Map all fields from backend, preserving upload states
+        const ahli = { 
+          ...template, 
+          ...entry, 
+          ktpFile: null, 
+          aktaKelahiranFile: null,
+          // Preserve upload states from backend
+          aktaUploaded: entry.aktaUploaded || false,
+          aktaUploading: entry.aktaUploading || false,
+          aktaUploadProgress: entry.aktaUploadProgress || 0
+        }
+        
+        // Handle file names
+        if (entry.ktpFileName) ahli.ktpFileName = entry.ktpFileName
+        if (entry.aktaFileName) ahli.aktaFileName = entry.aktaFileName
+        
+        // Ensure hubungan is set correctly
+        if (entry.hubungan) {
+          ahli.hubungan = entry.hubungan
+        }
+        
+        return ahli
+      })
+      
+      // Ensure minimum 2 entries
+      while (normalized.length < 2) {
+        normalized.push(newEmptyAhli())
+      }
+      
+      form.ahliWarisList.splice(0, form.ahliWarisList.length, ...normalized)
+    } else {
+      // Reset to default if no data
+      form.ahliWarisList.splice(0, form.ahliWarisList.length, spouseTemplate(), newEmptyAhli())
+    }
+    
+    // Load saksi data
+    if (Array.isArray(editData.saksiList) && editData.saksiList.length > 0) {
+      const mapped = editData.saksiList.map((item) => {
+        const template = newEmptySaksi()
+        
+        // Map all fields from backend
+        const saksi = { 
+          ...template, 
+          ...item, 
+          ktpFile: null,
+          // Preserve any upload states
+          aktaUploaded: item.aktaUploaded || false,
+          aktaUploading: item.aktaUploading || false,
+          aktaUploadProgress: item.aktaUploadProgress || 0
+        }
+        
+        if (item.ktpFileName) saksi.ktpFileName = item.ktpFileName
+        if (item.aktaFileName) saksi.aktaFileName = item.aktaFileName
+        
+        return saksi
+      })
+      
+      // Ensure minimum 2 entries
+      while (mapped.length < 2) {
+        mapped.push(newEmptySaksi())
+      }
+      
+      form.saksiList.splice(0, form.saksiList.length, ...mapped)
+    } else {
+      // Reset to default if no data
+      form.saksiList.splice(0, form.saksiList.length, newEmptySaksi(), newEmptySaksi())
+    }
+    
+    // Load dokumen pendukung
+    if (Array.isArray(editData.dokumenPendukung) && editData.dokumenPendukung.length > 0) {
+      const documents = editData.dokumenPendukung.map(doc => ({
+        nama: doc.nama || '',
+        fileName: doc.fileName || '',
+        file: null, // Reset file input
+        uploaded: !!doc.uploaded || !!doc.fileName
+      }))
+      form.dokumenPendukung.splice(0, form.dokumenPendukung.length, ...documents)
+    } else {
+      // Reset to empty if no data
+      form.dokumenPendukung.splice(0, form.dokumenPendukung.length)
+    }
+    
+    // Show success message
+    const formId = editingFormId.value
+    Swal.fire({
+      icon: 'success',
+      title: 'Data Dimuat',
+      text: `Form ID ${formId} berhasil dimuat untuk edit`,
+      timer: 2000,
+      showConfirmButton: false
+    })
+    
+    console.log('Edit data loaded successfully for form ID:', formId)
+    console.log('Loaded form data:', {
+      pewaris: form.pewaris,
+      ahliWarisList: form.ahliWarisList,
+      saksiList: form.saksiList,
+      dokumenPendukung: form.dokumenPendukung
+    })
+  } catch (error) {
+    console.error('Failed to load edit data:', error)
+    Swal.fire({
+      icon: 'error',
+      title: 'Gagal Memuat Data Edit',
+      text: 'Terjadi kesalahan saat memuat data untuk edit. Halaman akan dimuat normal.'
+    })
+  }
+}
+
 const loadFormDraft = () => {
   if (!isBrowser) return
+  
+  // First check if we're editing an existing form
+  const editData = localStorage.getItem('pengajuan-form-edit-data')
+  if (editData) {
+    try {
+      const parsed = JSON.parse(editData)
+      loadEditData(parsed)
+      // Remove edit data after loading
+      localStorage.removeItem('pengajuan-form-edit-data')
+      return
+    } catch (error) {
+      console.warn('Failed to load edit data', error)
+      localStorage.removeItem('pengajuan-form-edit-data')
+    }
+  }
+  
+  // Load draft if not editing
   const raw = localStorage.getItem(STORAGE_KEY)
   if (!raw) return
   try {
@@ -119,6 +279,13 @@ const loadFormDraft = () => {
       })
       if (mapped.length < 2) mapped.push(newEmptySaksi())
       form.saksiList.splice(0, form.saksiList.length, ...mapped)
+    }
+    if (Array.isArray(draft.dokumenPendukung) && draft.dokumenPendukung.length > 0) {
+      form.dokumenPendukung.splice(0, form.dokumenPendukung.length, ...draft.dokumenPendukung.map(doc => ({
+        ...doc,
+        file: null,
+        uploaded: !!doc.fileName
+      })))
     }
     if (typeof draft.currentStep === 'number' && draft.currentStep >= 1 && draft.currentStep <= steps.length) {
       currentStep.value = draft.currentStep
@@ -792,19 +959,25 @@ const prevStep = () => {
 const submitForm = async () => {
   if (!validateStep4()) return
   
-  if (!formId.value) {
+  const targetFormId = isEditing.value ? editingFormId.value : formId.value
+  if (!targetFormId) {
     Swal.fire('Error', 'ID form tidak ditemukan. Silakan refresh halaman.', 'error')
     return
   }
   
+  const actionText = isEditing.value ? 'Edit dan Kirim' : 'Kirim Permohonan'
+  const descText = isEditing.value 
+    ? `Pastikan perubahan data sudah benar. Form ID: ${targetFormId}`
+    : `Pastikan data sudah benar. Data tidak dapat diubah. Form ID: ${targetFormId}`
+  
   const result = await Swal.fire({
-    title: 'Kirim Permohonan?',
-    text: `Pastikan data sudah benar. Data tidak dapat diubah. Form ID: ${formId.value}`,
+    title: `${actionText}?`,
+    text: descText,
     icon: 'question',
     showCancelButton: true,
     confirmButtonColor: '#16a34a',
     cancelButtonColor: '#d33',
-    confirmButtonText: 'Ya, Kirim!'
+    confirmButtonText: `Ya, ${actionText}!`
   })
   
   if (result.isConfirmed) {
@@ -833,12 +1006,16 @@ const submitForm = async () => {
       }
       
       // Submit to PUT /api/request/:id_request
-      const response = await api.put(`/form/${formId.value}`, formData)
+      const response = await api.put(`/form/${targetFormId}`, formData)
+      
+      const successText = isEditing.value 
+        ? 'Permohonan berhasil diperbarui dan sedang diproses.'
+        : 'Permohonan berhasil dikirim dan sedang diproses.'
       
       await Swal.fire({ 
         icon: 'success', 
         title: 'Berhasil!', 
-        text: 'Permohonan berhasil dikirim dan sedang diproses.', 
+        text: successText, 
         confirmButtonColor: '#16a34a' 
       })
       
@@ -859,6 +1036,12 @@ const submitForm = async () => {
 
 // --- APPROVAL HANDLER ---
 const handleApproval = async () => {
+  // Skip approval step if editing
+  if (isEditing.value) {
+    isApproved.value = true
+    return
+  }
+  
   try {
     // Hit API /api/form/create
     const response = await api.post('/form/create')
@@ -882,6 +1065,13 @@ const handleApproval = async () => {
 
 // --- CHECK EXISTING FORMS ---
 const checkExistingForms = async () => {
+  // Skip checking if we're in edit mode
+  if (isEditing.value) {
+    isApproved.value = true
+    isChecking.value = false
+    return
+  }
+  
   try {
     const response = await api.get('/form/')
     const data = response?.data
@@ -996,7 +1186,15 @@ onUnmounted(() => {
     <div v-else>
     
     <div class="mb-8">
-      <h1 class="text-2xl font-bold text-gray-800 mb-6">Formulir Pengajuan Waris</h1>
+      <div class="flex items-center gap-3 mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">Formulir Pengajuan Waris</h1>
+        <div v-if="isEditing" class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+          </svg>
+          Mode Edit - ID: {{ editingFormId }}
+        </div>
+      </div>
       <div class="flex items-center justify-between relative">
         <div class="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-gray-200 -z-10"></div>
         <div class="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 bg-green-600 -z-10 transition-all duration-500 ease-out" :style="{ width: `${progressWidth}%` }"></div>
