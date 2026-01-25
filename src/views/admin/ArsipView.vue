@@ -61,7 +61,7 @@ const filteredArchives = computed(() => {
   return allApplications.value.filter(app => {
     const matchQuery = 
       app.profile_name?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      app.kode_registrasi?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      app.id?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       app.user_email?.toLowerCase().includes(searchQuery.value.toLowerCase())
     
     const matchYear = selectedYear.value 
@@ -107,7 +107,7 @@ const handleDownload = async (application) => {
     const downloadUrl = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = downloadUrl
-    link.download = `surat-pernyataan-${application.kode_registrasi || application.id}.pdf`
+    link.download = `surat-pernyataan-${application.id}.pdf`
     
     // Trigger download
     document.body.appendChild(link)
@@ -216,7 +216,7 @@ onMounted(() => {
 
           <!-- Data Rows -->
           <tr v-else v-for="app in filteredArchives" :key="app.id" class="hover:bg-blue-50/30 transition-colors">
-            <td class="px-6 py-4 font-mono text-blue-600 font-medium">{{ app.kode_registrasi || '-' }}</td>
+            <td class="px-6 py-4 font-mono text-blue-600 font-medium">{{ app.id || '-' }}</td>
             <td class="px-6 py-4 font-bold text-gray-800">{{ app.profile_name || app.user_email || '-' }}</td>
             <td class="px-6 py-4">{{ app.profile_nik || '-' }}</td>
             <td class="px-6 py-4">

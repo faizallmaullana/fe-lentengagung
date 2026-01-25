@@ -41,7 +41,7 @@ const filteredApplications = computed(() => {
   if (!searchQuery.value) return applications.value
   return applications.value.filter(app => 
     app.profile_name?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-    app.kode_registrasi?.toLowerCase().includes(searchQuery.value.toLowerCase())
+    app.id?.toLowerCase().includes(searchQuery.value.toLowerCase())
   )
 })
 
@@ -195,7 +195,7 @@ onMounted(() => {
           <!-- Data Rows -->
           <tr v-else v-for="app in filteredApplications" :key="app.id" class="hover:bg-blue-50/30 transition-colors">
             <td class="px-6 py-4 font-medium text-gray-900">
-              {{ app.kode_registrasi || '-' }}
+              {{ app.id || '-' }}
             </td>
             <td class="px-6 py-4">
               {{ app.profile_name || app.user_email || '-' }}
