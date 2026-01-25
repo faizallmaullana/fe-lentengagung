@@ -22,16 +22,10 @@ const menus = [
   { name: 'Riwayat Pengajuan', path: '/dashboard/riwayat' , icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z' },
 ]
 
-// Compute visible menus: hide Dashboard unless user is admin/petugas
+// Semua menu ditampilkan untuk user, termasuk Dashboard
 import { computed } from 'vue'
 const visibleMenus = computed(() => {
-  return menus.filter(item => {
-    if (item.name === 'Dashboard') {
-      // `isAdmin` from store indicates petugas; check .value in JS
-      return !!authStore.isAdmin?.value
-    }
-    return true
-  })
+  return menus // Tampilkan semua menu tanpa filter
 })
 // '/maintenance'
 </script>
