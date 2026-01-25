@@ -20,7 +20,28 @@ const fetchUserApplications = async () => {
     isLoading.value = true
     const data = await apiGet('/form/list')
     // Filter hanya aplikasi milik user yang sedang login
-    userApplications.value = data || []
+    const applications = data || []
+    
+    // Untuk setiap aplikasi, ambil detail form untuk mendapatkan nama pewaris
+    const applicationsWithPewaris = await Promise.all(
+      applications.map(async (app) => {
+        try {
+          const detail = await apiGet(`/form/${app.id}`)
+          return {
+            ...app,
+            pewaris_nama: detail.pewaris?.nama || 'Belum diisi'
+          }
+        } catch (error) {
+          console.error(`Error fetching detail for ${app.id}:`, error)
+          return {
+            ...app,
+            pewaris_nama: 'Belum diisi'
+          }
+        }
+      })
+    )
+    
+    userApplications.value = applicationsWithPewaris
   } catch (error) {
     console.error('Error fetching user applications:', error)
     Swal.fire({
@@ -224,8 +245,9 @@ onMounted(() => {
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 min-h-[400px] flex flex-col">
         
-        <div class="grid grid-cols-5 gap-4 p-5 border-b border-gray-100 text-sm font-bold text-gray-500 bg-gray-50/50 rounded-t-xl">
+        <div class="grid grid-cols-6 gap-4 p-5 border-b border-gray-100 text-sm font-bold text-gray-500 bg-gray-50/50 rounded-t-xl">
             <div>NO. REGISTRASI</div>
+            <div>NAMA PEWARIS</div>
             <div>TANGGAL PENGAJUAN</div>
             <div>STATUS</div>
             <div>KETERANGAN</div>
@@ -245,10 +267,11 @@ onMounted(() => {
             <div 
                 v-for="app in filteredApps" 
                 :key="app.id"
-                class="grid grid-cols-5 gap-4 p-5 border-b border-gray-50 items-center text-sm transition-colors"
+                class="grid grid-cols-6 gap-4 p-5 border-b border-gray-50 items-center text-sm transition-colors"
                 :class="getStatusInfo(app.status).action === 'update' ? 'bg-red-50 border-l-4 border-l-red-500' : 'hover:bg-gray-50'"
             >
-                <div class="font-medium text-slate-800">{{ app.kode_registrasi || '-' }}</div>
+                <div class="font-medium text-slate-800">{{ app.id || '-' }}</div>
+                <div class="text-slate-700 font-medium">{{ app.pewaris_nama || 'Belum diisi' }}</div>
                 <div class="text-slate-500">{{ formatDate(app.timestamp) }}</div>
                 <div>
                     <span 

@@ -19,8 +19,8 @@ const filteredList = computed(() => {
   if (!searchQuery.value) return applications.value
   const query = searchQuery.value.toLowerCase()
   return applications.value.filter(app => 
-    app.pewaris.toLowerCase().includes(query) || 
-    app.id.toLowerCase().includes(query)
+    (app.pewaris || '').toLowerCase().includes(query) || 
+    (app.id || '').toLowerCase().includes(query)
   )
 })
 
@@ -40,20 +40,48 @@ const loadApplications = async () => {
   try {
     const res = await api.get('/form/all')
     const data = res?.data
+    
+    console.log('API Response:', data)
+    
     // Normalize response shapes
     let items = []
     if (Array.isArray(data)) items = data
     else if (data && Array.isArray(data.data)) items = data.data
     else if (data) items = [data]
 
+    console.log('Items array:', items)
+
     // Map to UI shape
-    applications.value = items.map(it => ({
-      id: it.id || it.kode_registrasi || it.registration_code || '---',
-      date: it.created_at || it.timestamp || it.date || '',
-      pewaris: it.pewaris?.nama || it.fields?.nama || it.profile?.name || it.user_name || it.owner_name || '—',
-      status: it.status || it.state || 'Diajukan',
-      note: it.note || it.fields?.keterangan || ''
-    }))
+    applications.value = items.map((it, index) => {
+      console.log(`Item ${index}:`, it)
+      
+      // Try multiple possible paths for pewaris name - prioritize pewaris_nama like in DashboardView
+      let pewarisName = '—'
+      if (it.pewaris_nama) pewarisName = it.pewaris_nama
+      else if (it.pewaris?.nama) pewarisName = it.pewaris.nama
+      else if (it.pewaris?.name) pewarisName = it.pewaris.name
+      else if (typeof it.pewaris === 'string') pewarisName = it.pewaris
+      else if (it.nama_pewaris) pewarisName = it.nama_pewaris
+      else if (it.user_name) pewarisName = it.user_name
+      else if (it.owner_name) pewarisName = it.owner_name
+      else if (it.fields?.nama) pewarisName = it.fields.nama
+      else if (it.profile?.name) pewarisName = it.profile.name
+      
+      console.log(`Pewaris name found: "${pewarisName}" for item:`, it)
+      
+      const mappedItem = {
+        id: it.kode_registrasi || it.id || it.registration_code || '---',
+        date: it.created_at || it.timestamp || it.date || '',
+        pewaris: pewarisName,
+        status: it.status || it.state || 'Diajukan',
+        note: it.note || it.fields?.keterangan || ''
+      }
+      
+      console.log('Mapped item:', mappedItem)
+      return mappedItem
+    })
+    
+    console.log('Final applications array:', applications.value)
   } catch (error) {
     console.error('Failed to load applications', error)
     Swal.fire({ icon: 'error', title: 'Gagal memuat riwayat', text: 'Coba lagi nanti.' })
@@ -240,11 +268,11 @@ const downloadDoc = (docName) => {
         <table class="w-full text-left text-sm text-gray-600">
           <thead class="bg-gray-50 border-b border-gray-100 text-xs uppercase font-semibold text-gray-500">
             <tr>
-              <th class="px-6 py-4">No. Registrasi</th>
-              <th class="px-6 py-4">Nama Pewaris</th>
-              <th class="px-6 py-4">Tanggal Pengajuan</th>
-              <th class="px-6 py-4 text-center">Status</th>
-              <th class="px-6 py-4 text-center">Aksi</th>
+              <th class="px-4 py-4">No. Registrasi</th>
+              <th class="px-4 py-4">Nama Pewaris</th>
+              <th class="px-4 py-4">Tanggal Pengajuan</th>
+              <th class="px-4 py-4 text-center">Status</th>
+              <th class="px-4 py-4 text-center">Aksi</th>
             </tr>
           </thead>
           
@@ -254,25 +282,27 @@ const downloadDoc = (docName) => {
               :key="item.id" 
               class="hover:bg-gray-50 transition-colors group"
             >
-              <td class="px-6 py-4 font-medium text-gray-900">
+              <td class="px-4 py-4 font-medium text-gray-900">
                 {{ item.id }}
               </td>
               
-              <td class="px-6 py-4">
-                <p class="text-gray-900 font-medium">{{ item.pewaris }}</p>
-                <p class="text-xs text-gray-400 mt-0.5 truncate max-w-[200px]">{{ item.note }}</p>
+              <td class="px-4 py-4">
+                <div class="flex flex-col">
+                  <span class="text-gray-900 font-medium">{{ item.pewaris || '---' }}</span>
+                  <span v-if="item.note" class="text-xs text-gray-400 mt-0.5 truncate max-w-[180px]">{{ item.note }}</span>
+                </div>
               </td>
 
-              <td class="px-6 py-4 whitespace-nowrap">
+              <td class="px-4 py-4 whitespace-nowrap">
                 <div class="flex items-center gap-2">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-400">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                   </svg>
-                  {{ item.date }}
+                  <span class="text-sm">{{ item.date }}</span>
                 </div>
               </td>
 
-              <td class="px-6 py-4 text-center">
+              <td class="px-4 py-4 text-center">
                 <span 
                   class="px-3 py-1 rounded-full text-xs font-semibold border inline-flex items-center gap-1.5"
                   :class="getStatusClass(item.status)"
@@ -282,7 +312,7 @@ const downloadDoc = (docName) => {
                 </span>
               </td>
 
-              <td class="px-6 py-4 text-center">
+              <td class="px-4 py-4 text-center">
                 <div class="flex items-center justify-center gap-2">
                   <button 
                     @click="viewDetail(item.id)"
