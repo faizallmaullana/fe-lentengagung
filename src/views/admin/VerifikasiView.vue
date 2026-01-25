@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { apiGet } from '@/axios'
+import { apiGet, apiPost } from '@/axios'
 import Swal from 'sweetalert2'
 
 const route = useRoute()
@@ -134,6 +134,32 @@ const formatDate = (dateString) => {
   })
 }
 
+// Format status untuk display
+const getStatusInfo = (status) => {
+  const statusMap = {
+    'Pending': { text: 'Menunggu Review', class: 'bg-yellow-100 text-yellow-700', canAction: true },
+    'Review': { text: 'Dalam Review', class: 'bg-blue-100 text-blue-700', canAction: true },
+    'Disetujui': { text: 'Disetujui', class: 'bg-green-100 text-green-700', canAction: false },
+    'Ditolak': { text: 'Ditolak', class: 'bg-red-100 text-red-700', canAction: false },
+    'Approved': { text: 'Disetujui', class: 'bg-green-100 text-green-700', canAction: false },
+    'Rejected': { text: 'Ditolak', class: 'bg-red-100 text-red-700', canAction: false }
+  }
+  return statusMap[status] || { text: status, class: 'bg-gray-100 text-gray-700', canAction: true }
+}
+
+// Computed untuk status form
+const currentStatus = computed(() => {
+  if (!formDetail.value) return null
+  // Ambil dari response data atau default ke 'Review'
+  return formDetail.value.status || 'Review'
+})
+
+// Check apakah masih bisa melakukan aksi
+const canPerformAction = computed(() => {
+  const status = getStatusInfo(currentStatus.value)
+  return status.canAction
+})
+
 // Load data saat component di-mount
 onMounted(() => {
   fetchFormDetail()
@@ -144,32 +170,79 @@ onMounted(() => {
 const handleApprove = () => {
   Swal.fire({
     title: 'Setujui Permohonan?',
-    text: "Status akan berubah menjadi 'Draft Siap' dan notifikasi dikirim ke warga.",
+    text: "Status akan berubah menjadi 'Disetujui' dan notifikasi dikirim ke pemohon.",
+    input: 'textarea',
+    inputLabel: 'Alasan Persetujuan (Opsional)',
+    inputPlaceholder: 'Contoh: Dokumen lengkap dan valid, memenuhi persyaratan...',
     icon: 'question',
     showCancelButton: true,
     confirmButtonColor: '#16a34a',
-    confirmButtonText: 'Ya, Setujui'
+    confirmButtonText: 'Ya, Setujui',
+    cancelButtonText: 'Batal',
+    showLoaderOnConfirm: true,
+    preConfirm: async (reason) => {
+      try {
+        const response = await apiPost(`/form/${applicationId}/approve`, { 
+          reason: reason || '' 
+        })
+        return response
+      } catch (error) {
+        Swal.showValidationMessage(`Error: ${error.message}`)
+        return false
+      }
+    }
   }).then((result) => {
     if (result.isConfirmed) {
-      Swal.fire('Berhasil', 'Permohonan disetujui. Draft surat telah dibuat.', 'success')
-      router.push('/admin/antrian')
+      Swal.fire({
+        icon: 'success',
+        title: 'Berhasil!',
+        text: 'Permohonan telah disetujui.',
+        confirmButtonText: 'Kembali ke Daftar'
+      }).then(() => {
+        router.push('/admin/antrian')
+      })
     }
   })
 }
 
 const handleReject = () => {
   Swal.fire({
-    title: 'Tolak / Minta Revisi',
+    title: 'Tolak Permohonan',
+    text: 'Silakan berikan alasan penolakan untuk pemohon.',
     input: 'textarea',
-    inputLabel: 'Alasan Penolakan / Catatan Revisi',
-    inputPlaceholder: 'Contoh: Scan KTP buram, mohon upload ulang...',
+    inputLabel: 'Alasan Penolakan (Wajib)',
+    inputPlaceholder: 'Contoh: Scan KTP buram dan tidak terbaca, mohon upload ulang dengan kualitas yang lebih baik...',
     showCancelButton: true,
     confirmButtonColor: '#d33',
-    confirmButtonText: 'Kirim Revisi'
+    confirmButtonText: 'Tolak Permohonan',
+    cancelButtonText: 'Batal',
+    inputValidator: (value) => {
+      if (!value || value.trim().length < 10) {
+        return 'Alasan penolakan harus diisi minimal 10 karakter!'
+      }
+    },
+    showLoaderOnConfirm: true,
+    preConfirm: async (reason) => {
+      try {
+        const response = await apiPost(`/form/${applicationId}/reject`, { 
+          reason: reason.trim() 
+        })
+        return response
+      } catch (error) {
+        Swal.showValidationMessage(`Error: ${error.message}`)
+        return false
+      }
+    }
   }).then((result) => {
-    if (result.isConfirmed && result.value) {
-      Swal.fire('Terkirim', 'Instruksi revisi telah dikirim ke pemohon.', 'success')
-      router.push('/admin/antrian')
+    if (result.isConfirmed) {
+      Swal.fire({
+        icon: 'success',
+        title: 'Permohonan Ditolak',
+        text: 'Alasan penolakan telah dikirim ke pemohon.',
+        confirmButtonText: 'Kembali ke Daftar'
+      }).then(() => {
+        router.push('/admin/antrian')
+      })
     }
   })
 }
@@ -209,8 +282,9 @@ const handleGenerateDraft = () => {
         <div>
           <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
             Verifikasi: {{ applicationId }}
-            <span v-if="formDetail" class="px-2 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700 border border-yellow-200">
-              Review
+            <span v-if="formDetail" class="px-2 py-0.5 rounded text-xs border"
+                  :class="getStatusInfo(currentStatus).class">
+              {{ getStatusInfo(currentStatus).text }}
             </span>
           </h1>
           <p class="text-xs text-gray-500" v-if="formDetail">Form ID: {{ formDetail.id_form }}</p>
@@ -233,6 +307,12 @@ const handleGenerateDraft = () => {
     <div v-if="!isLoading && !error && formDetail" class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
       
       <div class="bg-white rounded-xl border border-gray-200 overflow-y-auto shadow-sm p-6 space-y-8 h-full custom-scrollbar">
+        
+        <!-- Status dan Alasan Keputusan (jika sudah ada) -->
+        <div v-if="formDetail && formDetail.alasan" class="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r">
+          <h3 class="text-sm font-bold text-blue-800 mb-2">Keputusan Admin</h3>
+          <p class="text-sm text-blue-700">{{ formDetail.alasan }}</p>
+        </div>
         
         <!-- Data Pewaris -->
         <div v-if="formDetail.pewaris">
@@ -379,12 +459,12 @@ const handleGenerateDraft = () => {
       </div>
     </div>
 
-    <div class="mt-4 pt-4 border-t border-gray-200 flex justify-end gap-4 bg-gray-50 -mx-8 px-8 pb-4 sticky bottom-0">
+    <div v-if="canPerformAction" class="mt-4 pt-4 border-t border-gray-200 flex justify-end gap-4 bg-gray-50 -mx-8 px-8 pb-4 sticky bottom-0">
       <button 
         @click="handleReject"
         class="px-6 py-2.5 border border-red-200 text-red-600 font-bold rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors"
       >
-        Tolak / Revisi
+        Tolak Permohonan
       </button>
       <button 
         @click="handleApprove"
@@ -392,6 +472,19 @@ const handleGenerateDraft = () => {
       >
         Setujui Permohonan
       </button>
+    </div>
+
+    <!-- Info jika sudah ada keputusan -->
+    <div v-else-if="formDetail" class="mt-4 pt-4 border-t border-gray-200 bg-gray-50 -mx-8 px-8 pb-4 sticky bottom-0">
+      <div class="text-center text-gray-600">
+        <p class="text-sm">Keputusan telah dibuat untuk formulir ini.</p>
+        <button 
+          @click="router.push('/admin/antrian')"
+          class="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+        >
+          Kembali ke Daftar
+        </button>
+      </div>
     </div>
 
   </div>
