@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { apiGet } from '@/axios'
 import Swal from 'sweetalert2'
 
 const route = useRoute()
@@ -8,39 +9,134 @@ const router = useRouter()
 
 const applicationId = route.params.id
 const isLoading = ref(true)
+const error = ref(null)
 
 // State untuk Dokumen yang sedang dipreview di kanan
 const activeDoc = ref('ktp') // Default: KTP
 
-// --- MOCK DATA DETAIL (Simulasi Database) ---
-const appData = ref({
-  id: applicationId,
-  status: 'Diajukan',
-  tglPengajuan: '06 Des 2025',
-  pewaris: {
-    nik: '3174091234567890',
-    nama: 'ALM. BUDI SANTOSO',
-    tglMeninggal: '2025-11-20',
-    alamat: 'Jl. Agung Raya I No. 9, RT 09/02, Lenteng Agung'
-  },
-  ahliWaris: [
-    { nama: 'SITI AMINAH', nik: '3174098877665544', hubungan: 'Istri' },
-    { nama: 'AGUNG SANTOSO', nik: '3174091122334455', hubungan: 'Anak Kandung' }
-  ],
-  harta: [
-    { jenis: 'Tanah & Bangunan', deskripsi: 'Rumah Tinggal di Lenteng Agung', bukti: 'SHM No. 12345' },
-    { jenis: 'Kendaraan', deskripsi: 'Honda Vario 2020', bukti: 'BPKB B 1234 SZZ' }
-  ],
-  documents: {
-    ktp: 'https://via.placeholder.com/600x400?text=Scan+KTP+Pewaris',
-    kk: 'https://via.placeholder.com/600x800?text=Scan+Kartu+Keluarga',
-    kematian: 'https://via.placeholder.com/600x800?text=Surat+Kematian'
+// Data detail form dari API
+const formDetail = ref(null)
+
+// Computed untuk mendapatkan URL file berdasarkan filename
+const getFileUrl = (fileType, fileName) => {
+  if (!fileName) return null
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:9090/api'
+  return `${baseUrl}/upload/${fileType}/${fileName}`
+}
+
+// Computed untuk daftar dokumen yang tersedia
+const availableDocuments = computed(() => {
+  if (!formDetail.value) return []
+  
+  const docs = []
+  const pewaris = formDetail.value.pewaris
+  
+  // Dokumen Pewaris
+  if (pewaris?.ktpFileName) {
+    docs.push({
+      key: 'ktp_pewaris',
+      label: 'KTP Pewaris', 
+      url: getFileUrl('ktp', pewaris.ktpFileName),
+      fileName: pewaris.ktpFileName
+    })
   }
+  
+  if (pewaris?.aktaFileName) {
+    docs.push({
+      key: 'akta_kematian',
+      label: 'Akta Kematian',
+      url: getFileUrl('akta', pewaris.aktaFileName),
+      fileName: pewaris.aktaFileName
+    })
+  }
+
+  // Dokumen Ahli Waris - KTP dan Akta
+  formDetail.value.ahliWarisList?.forEach((ahli, index) => {
+    if (ahli.ktpFileName) {
+      docs.push({
+        key: `ktp_ahli_${index}`,
+        label: `KTP ${ahli.nama}`,
+        url: getFileUrl('ktp', ahli.ktpFileName),
+        fileName: ahli.ktpFileName
+      })
+    }
+    if (ahli.aktaFileName) {
+      docs.push({
+        key: `akta_ahli_${index}`,
+        label: `Akta ${ahli.nama}`,
+        url: getFileUrl('akta', ahli.aktaFileName),
+        fileName: ahli.aktaFileName
+      })
+    }
+  })
+
+  // Dokumen Saksi - KTP
+  formDetail.value.saksiList?.forEach((saksi, index) => {
+    if (saksi.ktpFileName) {
+      docs.push({
+        key: `ktp_saksi_${index}`,
+        label: `KTP ${saksi.nama}`,
+        url: getFileUrl('ktp', saksi.ktpFileName),
+        fileName: saksi.ktpFileName
+      })
+    }
+  })
+
+  // Dokumen Pendukung
+  formDetail.value.dokumenPendukung?.forEach((dok, index) => {
+    if (dok.fileName) {
+      docs.push({
+        key: `dokumen_${index}`,
+        label: dok.nama || `Dokumen ${index + 1}`,
+        url: getFileUrl('documents', dok.fileName),
+        fileName: dok.fileName
+      })
+    }
+  })
+
+  return docs
 })
 
-// Simulasi Loading Data
+// URL dokumen yang sedang aktif
+const activeDocumentUrl = computed(() => {
+  const doc = availableDocuments.value.find(d => d.key === activeDoc.value)
+  return doc?.url || null
+})
+
+// Fetch detail form dari API
+const fetchFormDetail = async () => {
+  try {
+    isLoading.value = true
+    error.value = null
+    const data = await apiGet(`/form/${applicationId}`)
+    formDetail.value = data
+    
+    // Set dokumen aktif ke dokumen pertama yang tersedia
+    if (availableDocuments.value.length > 0) {
+      activeDoc.value = availableDocuments.value[0].key
+    }
+  } catch (err) {
+    console.error('Error fetching form detail:', err)
+    error.value = err.message || 'Gagal memuat detail formulir'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Format tanggal
+const formatDate = (dateString) => {
+  if (!dateString) return '-'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  })
+}
+
+// Load data saat component di-mount
 onMounted(() => {
-  setTimeout(() => { isLoading.value = false }, 800)
+  fetchFormDetail()
 })
 
 // --- ACTIONS ---
@@ -113,11 +209,11 @@ const handleGenerateDraft = () => {
         <div>
           <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
             Verifikasi: {{ applicationId }}
-            <span class="px-2 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700 border border-yellow-200">
-              {{ appData.status }}
+            <span v-if="formDetail" class="px-2 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700 border border-yellow-200">
+              Review
             </span>
           </h1>
-          <p class="text-xs text-gray-500">Diajukan pada: {{ appData.tglPengajuan }}</p>
+          <p class="text-xs text-gray-500" v-if="formDetail">Form ID: {{ formDetail.id_form }}</p>
         </div>
       </div>
 
@@ -134,84 +230,126 @@ const handleGenerateDraft = () => {
       </div>
     </div>
 
-    <div v-if="!isLoading" class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
+    <div v-if="!isLoading && !error && formDetail" class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
       
       <div class="bg-white rounded-xl border border-gray-200 overflow-y-auto shadow-sm p-6 space-y-8 h-full custom-scrollbar">
         
-        <div>
+        <!-- Data Pewaris -->
+        <div v-if="formDetail.pewaris">
           <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider border-b pb-2 mb-4">1. Data Pewaris</h3>
           <div class="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
             <div class="text-gray-500">NIK</div>
-            <div class="font-medium text-gray-900">{{ appData.pewaris.nik }}</div>
+            <div class="font-medium text-gray-900">{{ formDetail.pewaris.nik || '-' }}</div>
             <div class="text-gray-500">Nama Lengkap</div>
-            <div class="font-medium text-gray-900">{{ appData.pewaris.nama }}</div>
+            <div class="font-medium text-gray-900">{{ formDetail.pewaris.nama || '-' }}</div>
+            <div class="text-gray-500">Tanggal Lahir</div>
+            <div class="font-medium text-gray-900">{{ formatDate(formDetail.pewaris.tanggalLahir) }}</div>
+            <div class="text-gray-500">Tempat Lahir</div>
+            <div class="font-medium text-gray-900">{{ formDetail.pewaris.tempatLahir || '-' }}</div>
             <div class="text-gray-500">Tanggal Meninggal</div>
-            <div class="font-medium text-gray-900">{{ appData.pewaris.tglMeninggal }}</div>
-            <div class="text-gray-500">Alamat Terakhir</div>
-            <div class="font-medium text-gray-900">{{ appData.pewaris.alamat }}</div>
+            <div class="font-medium text-gray-900">{{ formatDate(formDetail.pewaris.tanggalMeninggal) }}</div>
+            <div class="text-gray-500">Alamat</div>
+            <div class="font-medium text-gray-900">{{ formDetail.pewaris.alamat || '-' }}</div>
+            <div class="text-gray-500">Agama</div>
+            <div class="font-medium text-gray-900">{{ formDetail.pewaris.agama || '-' }}</div>
+            <div class="text-gray-500">Pekerjaan</div>
+            <div class="font-medium text-gray-900">{{ formDetail.pewaris.pekerjaan || '-' }}</div>
+            <div class="text-gray-500">Status Perkawinan</div>
+            <div class="font-medium text-gray-900">{{ formDetail.pewaris.statusPerkawinan || '-' }}</div>
           </div>
         </div>
 
-        <div>
+        <!-- Data Ahli Waris -->
+        <div v-if="formDetail.ahliWarisList && formDetail.ahliWarisList.length > 0">
           <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider border-b pb-2 mb-4">2. Data Ahli Waris</h3>
           <div class="space-y-3">
-            <div v-for="(ahli, idx) in appData.ahliWaris" :key="idx" class="p-3 bg-gray-50 rounded-lg border border-gray-100 text-sm">
+            <div v-for="(ahli, idx) in formDetail.ahliWarisList" :key="idx" class="p-3 bg-gray-50 rounded-lg border border-gray-100 text-sm">
               <div class="flex justify-between font-bold text-gray-800">
-                <span>{{ ahli.nama }}</span>
-                <span class="text-blue-600 bg-blue-50 px-2 rounded">{{ ahli.hubungan }}</span>
+                <span>{{ ahli.nama || '-' }}</span>
+                <span class="text-blue-600 bg-blue-50 px-2 rounded">{{ ahli.hubungan || '-' }}</span>
               </div>
-              <div class="text-gray-500 mt-1">NIK: {{ ahli.nik }}</div>
+              <div class="text-gray-500 mt-1">NIK: {{ ahli.nik || '-' }}</div>
+              <div class="flex gap-2 mt-2">
+                <div v-if="ahli.ktpFileName" class="text-xs text-green-600">
+                  ✓ KTP tersedia
+                </div>
+                <div v-if="ahli.aktaFileName" class="text-xs text-green-600">
+                  ✓ Dokumen akta tersedia
+                </div>
+                <div v-if="!ahli.ktpFileName && !ahli.aktaFileName" class="text-xs text-red-600">
+                  ✗ Belum ada dokumen
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div>
-          <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider border-b pb-2 mb-4">3. Harta Warisan</h3>
-          <ul class="list-disc pl-5 text-sm space-y-2 text-gray-700">
-            <li v-for="(aset, idx) in appData.harta" :key="idx">
-              <span class="font-semibold">{{ aset.jenis }}:</span> {{ aset.deskripsi }} 
-              <span v-if="aset.bukti" class="text-gray-400 text-xs">({{ aset.bukti }})</span>
-            </li>
-          </ul>
+        <!-- Data Saksi -->
+        <div v-if="formDetail.saksiList && formDetail.saksiList.length > 0">
+          <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider border-b pb-2 mb-4">3. Data Saksi</h3>
+          <div class="space-y-3">
+            <div v-for="(saksi, idx) in formDetail.saksiList" :key="idx" class="p-3 bg-gray-50 rounded-lg border border-gray-100 text-sm">
+              <div class="flex justify-between font-bold text-gray-800">
+                <span>{{ saksi.nama || '-' }}</span>
+                <span class="text-purple-600 bg-purple-50 px-2 rounded">{{ saksi.hubungan || 'Saksi' }}</span>
+              </div>
+              <div class="text-gray-500 mt-1">NIK: {{ saksi.nik || '-' }}</div>
+              <div v-if="saksi.ktpFileName" class="text-xs text-green-600 mt-1">
+                ✓ Dokumen KTP tersedia
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dokumen Pendukung -->
+        <div v-if="formDetail.dokumenPendukung && formDetail.dokumenPendukung.length > 0">
+          <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider border-b pb-2 mb-4">4. Dokumen Pendukung</h3>
+          <div class="space-y-2">
+            <div v-for="(dok, idx) in formDetail.dokumenPendukung" :key="idx" class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100 text-sm">
+              <span class="font-medium">{{ dok.nama || `Dokumen ${idx + 1}` }}</span>
+              <span v-if="dok.uploaded" class="text-xs text-green-600">✓ Terupload</span>
+              <span v-else class="text-xs text-red-600">✗ Belum upload</span>
+            </div>
+          </div>
         </div>
 
       </div>
 
+      <!-- Panel Preview Dokumen -->
       <div class="bg-gray-800 rounded-xl overflow-hidden flex flex-col shadow-lg h-full">
         
-        <div class="bg-gray-900 p-2 flex justify-center gap-2 overflow-x-auto">
+        <!-- Tab Dokumen -->
+        <div class="bg-gray-900 p-2 flex justify-center gap-2 overflow-x-auto" v-if="availableDocuments.length > 0">
           <button 
-            @click="activeDoc = 'ktp'" 
-            class="px-4 py-2 rounded text-xs font-semibold transition-colors"
-            :class="activeDoc === 'ktp' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'"
+            v-for="doc in availableDocuments"
+            :key="doc.key"
+            @click="activeDoc = doc.key" 
+            class="px-3 py-2 rounded text-xs font-semibold transition-colors whitespace-nowrap"
+            :class="activeDoc === doc.key ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'"
           >
-            KTP Pewaris
-          </button>
-          <button 
-            @click="activeDoc = 'kk'" 
-            class="px-4 py-2 rounded text-xs font-semibold transition-colors"
-            :class="activeDoc === 'kk' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'"
-          >
-            Kartu Keluarga
-          </button>
-          <button 
-            @click="activeDoc = 'kematian'" 
-            class="px-4 py-2 rounded text-xs font-semibold transition-colors"
-            :class="activeDoc === 'kematian' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'"
-          >
-            Surat Kematian
+            {{ doc.label }}
           </button>
         </div>
 
+        <!-- Area Preview -->
         <div class="flex-1 bg-gray-700 flex items-center justify-center relative p-4 overflow-hidden">
+          <div v-if="availableDocuments.length === 0" class="text-gray-400 text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-50">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 18.75h-8.25A2.25 2.25 0 016 19.5V4.5a2.25 2.25 0 012.25-2.25H9" />
+            </svg>
+            <p class="text-sm">Tidak ada dokumen tersedia</p>
+          </div>
+          
           <img 
-            :src="appData.documents[activeDoc]" 
+            v-else-if="activeDocumentUrl"
+            :src="activeDocumentUrl" 
             alt="Preview Dokumen" 
             class="max-h-full max-w-full object-contain shadow-2xl rounded"
+            @error="$event.target.style.display='none'"
           />
           
-          <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm">
-            Mode Pratinjau (Zoom: Fit)
+          <div v-if="activeDocumentUrl" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm">
+            Mode Pratinjau
           </div>
         </div>
 
@@ -219,8 +357,26 @@ const handleGenerateDraft = () => {
 
     </div>
 
-    <div v-else class="flex-1 flex items-center justify-center">
-      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    <!-- Loading State -->
+    <div v-else-if="isLoading" class="flex-1 flex items-center justify-center">
+      <div class="text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <p class="mt-4 text-gray-500">Memuat detail formulir...</p>
+      </div>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="error" class="flex-1 flex items-center justify-center">
+      <div class="text-center text-red-600">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+        </svg>
+        <p class="text-lg font-semibold">Error</p>
+        <p class="text-sm">{{ error }}</p>
+        <button @click="fetchFormDetail" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          Coba Lagi
+        </button>
+      </div>
     </div>
 
     <div class="mt-4 pt-4 border-t border-gray-200 flex justify-end gap-4 bg-gray-50 -mx-8 px-8 pb-4 sticky bottom-0">
