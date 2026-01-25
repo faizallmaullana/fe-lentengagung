@@ -1,30 +1,99 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router' // [1] WAJIB IMPORT INI
+import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { apiGet } from '@/axios'
 import heroBg from '@/assets/images/hero-bg.png'
 
-const router = useRouter() // [2] WAJIB DEFINISIKAN INI
+const router = useRouter()
 
-// Data Statistik Dummy
-const stats = [
-  { label: 'Permohonan Baru', count: 5, color: 'text-yellow-600', bg: 'bg-yellow-50', bar: 'bg-yellow-500' },
-  { label: 'Permohonan Berjalan', count: 12, color: 'text-blue-600', bg: 'bg-blue-50', bar: 'bg-blue-500' },
-  { label: 'Dalam Perbaikan', count: 3, color: 'text-red-600', bg: 'bg-red-50', bar: 'bg-red-500' },
-]
+// State untuk loading dan data
+const isLoading = ref(true)
+const applications = ref([])
+const searchQuery = ref('')
 
-// Data Tabel Dummy (Mock Data Antrian)
-const applications = ref([
-  { id: 'REG-005', pewaris: 'Alm. Budi Santoso', pemohon: 'Agung Santoso', tgl: '06 Des 2025', status: 'Diajukan' },
-  { id: 'REG-004', pewaris: 'Alm. Siti Aminah', pemohon: 'Rina Wati', tgl: '05 Des 2025', status: 'Diajukan' },
-  { id: 'REG-003', pewaris: 'Alm. Suparman', pemohon: 'Joko', tgl: '04 Des 2025', status: 'Revisi' },
-  { id: 'REG-002', pewaris: 'Alm. Hartono', pemohon: 'Bambang', tgl: '02 Des 2025', status: 'Diproses' },
+// Data Statistik berdasarkan data real
+const stats = computed(() => [
+  { 
+    label: 'Permohonan Baru', 
+    count: applications.value.filter(app => app.status === 'Pending' || app.status === 'Submitted').length, 
+    color: 'text-yellow-600', 
+    bg: 'bg-yellow-50', 
+    bar: 'bg-yellow-500' 
+  },
+  { 
+    label: 'Permohonan Berjalan', 
+    count: applications.value.filter(app => app.status === 'Review' || app.status === 'InProcess').length, 
+    color: 'text-blue-600', 
+    bg: 'bg-blue-50', 
+    bar: 'bg-blue-500' 
+  },
+  { 
+    label: 'Dalam Perbaikan', 
+    count: applications.value.filter(app => app.status === 'Revision' || app.status === 'Rejected').length, 
+    color: 'text-red-600', 
+    bg: 'bg-red-50', 
+    bar: 'bg-red-500' 
+  },
 ])
 
-// [3] FUNGSI NAVIGASI YANG BENAR
+// Data yang difilter berdasarkan search
+const filteredApplications = computed(() => {
+  if (!searchQuery.value) return applications.value
+  return applications.value.filter(app => 
+    app.profile_name?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+    app.kode_registrasi?.toLowerCase().includes(searchQuery.value.toLowerCase())
+  )
+})
+
+// Fetch data dari API
+const fetchApplications = async () => {
+  try {
+    isLoading.value = true
+    const data = await apiGet('/form/list')
+    applications.value = data || []
+  } catch (error) {
+    console.error('Error fetching applications:', error)
+    // Tampilkan notifikasi error jika perlu
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Format tanggal
+const formatDate = (dateString) => {
+  if (!dateString) return '-'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  })
+}
+
+// Format status untuk display
+const getStatusInfo = (status) => {
+  const statusMap = {
+    'Pending': { text: 'Diajukan', class: 'bg-yellow-100 text-yellow-700' },
+    'Submitted': { text: 'Diajukan', class: 'bg-yellow-100 text-yellow-700' },
+    'Review': { text: 'Ditinjau', class: 'bg-blue-100 text-blue-700' },
+    'InProcess': { text: 'Diproses', class: 'bg-blue-100 text-blue-700' },
+    'Revision': { text: 'Revisi', class: 'bg-red-100 text-red-700' },
+    'Rejected': { text: 'Ditolak', class: 'bg-red-100 text-red-700' },
+    'Approved': { text: 'Disetujui', class: 'bg-green-100 text-green-700' },
+    'Completed': { text: 'Selesai', class: 'bg-green-100 text-green-700' }
+  }
+  return statusMap[status] || { text: status, class: 'bg-gray-100 text-gray-700' }
+}
+
+// Navigasi ke halaman verifikasi
 const handleVerifikasi = (id) => {
-  // Arahkan ke halaman detail verifikasi
   router.push(`/admin/verifikasi/${id}`)
 }
+
+// Load data saat component di-mount
+onMounted(() => {
+  fetchApplications()
+})
 </script>
 
 <template>
@@ -66,14 +135,19 @@ const handleVerifikasi = (id) => {
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div class="p-6 border-b border-gray-100 flex justify-between items-center">
         <div>
-            <h3 class="text-lg font-bold text-gray-800">Daftar Permohonan Terbaru</h3>
-            <p class="text-sm text-gray-500">Total 12.000 pemohon (Mock)</p>
+            <h3 class="text-lg font-bold text-gray-800">Daftar Permohonan</h3>
+            <p class="text-sm text-gray-500">
+              <span v-if="isLoading">Memuat data...</span>
+              <span v-else>Total {{ applications.length }} permohonan</span>
+            </p>
         </div>
         <div class="relative">
             <input 
+                v-model="searchQuery"
                 type="text" 
-                placeholder="Cari nama pemohon..." 
+                placeholder="Cari nama pemohon atau kode..." 
                 class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 w-64 transition-all"
+                :disabled="isLoading"
             />
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-gray-400 absolute left-3 top-3">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
@@ -84,28 +158,60 @@ const handleVerifikasi = (id) => {
       <table class="w-full text-left text-sm text-gray-600">
         <thead class="bg-gray-50 text-gray-500 font-semibold uppercase tracking-wider text-xs border-b border-gray-100">
           <tr>
-            <th class="px-6 py-4">Nama Pewaris</th>
+            <th class="px-6 py-4">Kode Registrasi</th>
             <th class="px-6 py-4">Nama Pemohon</th>
+            <th class="px-6 py-4">NIK</th>
             <th class="px-6 py-4">Tanggal Masuk</th>
             <th class="px-6 py-4 text-center">Status</th>
             <th class="px-6 py-4 text-right">Aksi</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-50">
-          <tr v-for="app in applications" :key="app.id" class="hover:bg-blue-50/30 transition-colors">
-            <td class="px-6 py-4 font-medium text-gray-900">{{ app.pewaris }}</td>
-            <td class="px-6 py-4">{{ app.pemohon }}</td>
-            <td class="px-6 py-4">{{ app.tgl }}</td>
+          <!-- Loading State -->
+          <tr v-if="isLoading">
+            <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+              <div class="flex justify-center items-center gap-2">
+                <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Memuat data...
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Empty State -->
+          <tr v-else-if="filteredApplications.length === 0">
+            <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+              <div class="flex flex-col items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 text-gray-400">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+                <span>{{ searchQuery ? 'Tidak ada data yang sesuai pencarian' : 'Belum ada permohonan' }}</span>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Data Rows -->
+          <tr v-else v-for="app in filteredApplications" :key="app.id" class="hover:bg-blue-50/30 transition-colors">
+            <td class="px-6 py-4 font-medium text-gray-900">
+              {{ app.kode_registrasi || '-' }}
+            </td>
+            <td class="px-6 py-4">
+              {{ app.profile_name || app.user_email || '-' }}
+            </td>
+            <td class="px-6 py-4 text-gray-600">
+              {{ app.profile_nik || '-' }}
+            </td>
+            <td class="px-6 py-4">
+              {{ formatDate(app.timestamp) }}
+            </td>
             <td class="px-6 py-4 text-center">
               <span 
                 class="px-3 py-1 rounded-full text-xs font-semibold inline-block"
-                :class="{
-                    'bg-yellow-100 text-yellow-700': app.status === 'Diajukan',
-                    'bg-blue-100 text-blue-700': app.status === 'Diproses',
-                    'bg-red-100 text-red-700': app.status === 'Revisi'
-                }"
+                :class="getStatusInfo(app.status).class"
               >
-                {{ app.status }}
+                {{ getStatusInfo(app.status).text }}
               </span>
             </td>
             <td class="px-6 py-4 text-right">
@@ -120,8 +226,13 @@ const handleVerifikasi = (id) => {
         </tbody>
       </table>
       
-      <div class="p-4 border-t border-gray-100 bg-gray-50 text-center text-xs text-gray-500">
-        Menampilkan 4 dari 12.000 data
+      <div class="p-4 border-t border-gray-100 bg-gray-50 text-center text-xs text-gray-500" v-if="!isLoading">
+        <span v-if="searchQuery">
+          Menampilkan {{ filteredApplications.length }} dari {{ applications.length }} data
+        </span>
+        <span v-else>
+          Menampilkan {{ applications.length }} data
+        </span>
       </div>
     </div>
 
