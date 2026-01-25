@@ -46,7 +46,7 @@ export const useAuthStore = defineStore('auth', () => {
     return true
   })
 
-  const isAdmin = computed(() => user.value?.role === 'petugas')
+  const isAdmin = computed(() => ['petugas', 'superadmin', 'admin'].includes(user.value?.role))
 
   // --- ACTIONS ---
 
@@ -72,7 +72,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (role === 'warga' && userData.role !== 'masyarakat') {
         return { success: false, message: 'Akun ini bukan akun Warga.' }
       }
-      if (role === 'admin' && userData.role !== 'petugas') {
+      if (role === 'admin' && !['petugas', 'superadmin', 'admin'].includes(userData.role)) {
         return { success: false, message: 'Akun ini bukan akun Petugas.' }
       }
 
@@ -149,7 +149,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   // UI helper: hide dashboard for masyarakat
   const showDashboard = computed(() => {
-    return isAuthenticated.value && (role.value !== 'masyarakat')
+    return isAuthenticated.value && (!['masyarakat'].includes(role.value))
   })
 
   return { 
