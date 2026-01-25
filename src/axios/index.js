@@ -2,7 +2,7 @@
 import axios from 'axios'
 
 // Base URL comes from Vite env (VITE_API_URL) or falls back to a sensible default
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:9090/api'
+const baseURL = import.meta.env.VITE_API_URL || '/api'
 
 // Create axios instance
 const api = axios.create({
