@@ -105,21 +105,67 @@ const filteredApps = computed(() => {
 })
 
 // Actions
-const handleDownload = (application) => {
-  Swal.fire({
-    title: 'Mengunduh Dokumen',
-    html: `Menyiapkan dokumen untuk ${application.kode_registrasi}...`,
-    timer: 1500,
-    timerProgressBar: true,
-    didOpen: () => Swal.showLoading()
-  }).then(() => {
+const handleDownload = async (application) => {
+  try {
+    // Tampilkan loading
+    Swal.fire({
+      title: 'Menyiapkan Dokumen PDF',
+      html: `Mengunduh dokumen untuk ${application.kode_registrasi}...`,
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading()
+    })
+
+    // Buat URL untuk download PDF
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:9090/api'
+    const token = localStorage.getItem('token')
+    const pdfUrl = `${baseUrl}/form/${application.id}/pdf`
+    
+    // Buat link download dengan authorization header
+    const response = await fetch(pdfUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error('Gagal mengunduh PDF')
+    }
+
+    // Convert response ke blob
+    const blob = await response.blob()
+    
+    // Buat download link
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = `surat-pernyataan-${application.kode_registrasi || application.id}.pdf`
+    
+    // Trigger download
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    // Cleanup
+    window.URL.revokeObjectURL(downloadUrl)
+
+    // Tutup loading dan tampilkan success
     Swal.fire({
       icon: 'success',
       title: 'Download Berhasil!',
-      text: 'Surat Pernyataan Ahli Waris telah diunduh.',
+      text: 'Surat Pernyataan Ahli Waris telah berhasil diunduh.',
       confirmButtonText: 'Tutup'
     })
-  })
+
+  } catch (error) {
+    console.error('Error downloading PDF:', error)
+    Swal.fire({
+      icon: 'error',
+      title: 'Download Gagal',
+      text: 'Terjadi kesalahan saat mengunduh dokumen. Silakan coba lagi.',
+      confirmButtonText: 'Tutup'
+    })
+  }
 }
 
 const handleUpdate = (application) => {
